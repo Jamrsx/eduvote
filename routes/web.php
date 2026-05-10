@@ -3,8 +3,9 @@
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\ElectionController;
-use App\Http\Controllers\Admin\ImportController;
+use App\Http\Controllers\Admin\SchoolRosterController;
 use App\Http\Controllers\Admin\StudentAccountController;
+use App\Http\Controllers\Admin\StudentRegistrationApprovalController;
 use App\Http\Controllers\Admin\VotingActivityController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
@@ -34,11 +35,45 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::delete('courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
     Route::get('elections', [ElectionController::class, 'index'])->name('elections.index');
     Route::get('students', [StudentAccountController::class, 'index'])->name('students.index');
-    Route::get('imports', [ImportController::class, 'index'])->name('imports.index');
+    Route::post('students', [StudentAccountController::class, 'store'])->name('students.store');
+    Route::get('students/accounts', [StudentAccountController::class, 'accounts'])->name('students.accounts');
+    Route::post('students/accounts/email-all', [StudentAccountController::class, 'emailCredentialsToAll'])->name('students.accounts.email-all');
+    Route::post('students/accounts/{user}/email-credentials', [StudentAccountController::class, 'emailStudentCredentials'])->name('students.accounts.email-credentials');
+    Route::post('students/{user}/disable-account', [StudentAccountController::class, 'disableStudentAccount'])->name('students.disable-account');
+    Route::post('students/{user}/enable-account', [StudentAccountController::class, 'enableStudentAccount'])->name('students.enable-account');
+    Route::get('students/imports/template', [StudentAccountController::class, 'downloadTemplate'])->name('students.imports.template');
+    Route::post('students/import', [StudentAccountController::class, 'importStudents'])->name('students.import');
+    Route::get('students/pending', [StudentRegistrationApprovalController::class, 'index'])->name('students.pending');
+    Route::post('students/pending/{user}/approve', [StudentRegistrationApprovalController::class, 'approve'])->name('students.pending.approve');
+    Route::post('students/pending/{user}/reject', [StudentRegistrationApprovalController::class, 'reject'])->name('students.pending.reject');
+    Route::get('roster', [SchoolRosterController::class, 'index'])->name('roster.index');
+    Route::get('roster/master-list', [SchoolRosterController::class, 'masterList'])->name('roster.master-list');
+    Route::get('roster/template', [SchoolRosterController::class, 'downloadTemplate'])->name('roster.template');
+    Route::post('roster/import', [SchoolRosterController::class, 'import'])->name('roster.import');
+    Route::delete('roster/{school_roster_entry}', [SchoolRosterController::class, 'destroy'])->name('roster.destroy');
+    Route::get('imports', fn (): RedirectResponse => redirect()->route('admin.students.index'));
     Route::get('voting', [VotingActivityController::class, 'index'])->name('voting.index');
 });
 
 Route::middleware(['auth', 'verified', 'student'])->prefix('student')->name('student.')->group(function () {
+    Route::get('pending-registration', fn () => Inertia::render('student/pending-registration', [
+        'breadcrumbs' => [
+            ['title' => 'Approval pending', 'href' => route('student.registration-pending')],
+        ],
+    ]))->name('registration-pending');
+
+    Route::get('registration-rejected', fn () => Inertia::render('student/registration-rejected', [
+        'breadcrumbs' => [
+            ['title' => 'Not approved', 'href' => route('student.registration-rejected')],
+        ],
+    ]))->name('registration-rejected');
+
+    Route::get('account-disabled', fn () => Inertia::render('student/account-disabled', [
+        'breadcrumbs' => [
+            ['title' => 'Account disabled', 'href' => route('student.account-disabled')],
+        ],
+    ]))->name('account-disabled');
+
     Route::get('dashboard', fn () => Inertia::render('student/dashboard', [
         'breadcrumbs' => [
             ['title' => 'Student', 'href' => route('student.dashboard')],

@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\StudentAccountStatus;
+use App\Enums\UserRole;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -35,15 +38,24 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
             ],
+            'pendingStudentRegistrationCount' => $user !== null && $user->role === UserRole::Admin
+                ? User::query()
+                    ->where('role', UserRole::Student)
+                    ->where('student_account_status', StudentAccountStatus::Pending)
+                    ->count()
+                : 0,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [
                 'success' => $request->session()->get('success'),
+                'import_warnings' => $request->session()->get('import_warnings'),
             ],
         ];
     }

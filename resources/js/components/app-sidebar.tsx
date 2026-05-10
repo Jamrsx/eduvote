@@ -1,11 +1,11 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     BarChart3,
+    BookMarked,
     BookOpen,
     CalendarDays,
     GraduationCap,
     LayoutGrid,
-    Upload,
     Users,
 } from 'lucide-react';
 import { useMemo } from 'react';
@@ -24,7 +24,7 @@ import {
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminCoursesIndex } from '@/routes/admin/courses';
 import { index as adminElectionsIndex } from '@/routes/admin/elections';
-import { index as adminImportsIndex } from '@/routes/admin/imports';
+import { index as adminRosterIndex } from '@/routes/admin/roster';
 import { index as adminStudentsIndex } from '@/routes/admin/students';
 import { index as adminVotingIndex } from '@/routes/admin/voting';
 import { dashboard } from '@/routes';
@@ -32,10 +32,14 @@ import { dashboard as studentDashboard } from '@/routes/student';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
-    const { auth } = usePage().props;
+    const { auth, pendingStudentRegistrationCount } = usePage().props;
 
     const mainNavItems = useMemo((): NavItem[] => {
         const items: NavItem[] = [];
+
+        const pendingRegistrationDot =
+            typeof pendingStudentRegistrationCount === 'number' &&
+            pendingStudentRegistrationCount > 0;
 
         if (auth.user?.role === 'admin') {
             items.push(
@@ -60,9 +64,10 @@ export function AppSidebar() {
                     icon: Users,
                 },
                 {
-                    title: 'Imports',
-                    href: adminImportsIndex(),
-                    icon: Upload,
+                    title: 'Pending student registrations',
+                    href: adminRosterIndex().url,
+                    icon: BookMarked,
+                    notificationDot: pendingRegistrationDot,
                 },
                 {
                     title: 'Ballots',
@@ -81,7 +86,7 @@ export function AppSidebar() {
         }
 
         return items;
-    }, [auth.user?.role]);
+    }, [auth.user?.role, pendingStudentRegistrationCount]);
 
     return (
         <Sidebar collapsible="icon" variant="inset">

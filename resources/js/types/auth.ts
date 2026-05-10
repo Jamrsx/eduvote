@@ -3,6 +3,7 @@ export type User = {
     name: string;
     email: string;
     role?: 'admin' | 'student';
+    student_account_status?: 'pending' | 'active' | 'rejected' | 'disabled' | null;
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;

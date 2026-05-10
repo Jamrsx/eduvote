@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\StudentAccountStatus;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,6 +30,7 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'role' => UserRole::Student,
+            'student_account_status' => StudentAccountStatus::Active,
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
@@ -64,6 +66,7 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'role' => UserRole::Admin,
+            'student_account_status' => null,
         ]);
     }
 
@@ -71,6 +74,25 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'role' => UserRole::Student,
+            'student_account_status' => StudentAccountStatus::Active,
+        ]);
+    }
+
+    public function pendingStudentRegistration(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => UserRole::Student,
+            'student_account_status' => StudentAccountStatus::Pending,
+            'email_verified_at' => now(),
+        ]);
+    }
+
+    public function disabledStudentAccount(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => UserRole::Student,
+            'student_account_status' => StudentAccountStatus::Disabled,
+            'email_verified_at' => now(),
         ]);
     }
 }

@@ -20,8 +20,16 @@ createInertiaApp({
                 return [AppLayout, SettingsLayout];
             case name.startsWith('admin/'):
                 return AppLayout;
-            case name.startsWith('student/'):
+            case name.startsWith('student/'): {
+                if (
+                    name === 'student/pending-registration' ||
+                    name === 'student/registration-rejected'
+                ) {
+                    return AuthLayout;
+                }
+
                 return AppLayout;
+            }
             default:
                 return AppLayout;
         }

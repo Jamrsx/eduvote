@@ -16,10 +16,13 @@ export default function VerifyEmail({ status }: Props) {
                     <h1 className="text-xl font-semibold tracking-tight">
                         Verify your email
                     </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Thanks for signing up. Before getting started, verify your
-                        email by clicking the link we sent. If you didn&apos;t
-                        receive the email, we can send another.
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                        Account sent to Admin — please wait for confirmation. Go to
+                        your administrator if you need your account accepted.
+                    </p>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                        Use the link in your email to verify this address, or resend
+                        below.
                     </p>
                 </div>
                 {status === 'verification-link-sent' && (
@@ -38,7 +41,7 @@ export default function VerifyEmail({ status }: Props) {
                         </Button>
                     )}
                 </Form>
-                <Form action={logout.url()} method="post" className="text-center">
+                <Form action={logout().url} method="post" className="text-center">
                     {({ processing }) => (
                         <Button
                             type="submit"

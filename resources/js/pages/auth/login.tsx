@@ -6,14 +6,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { request as forgotPasswordRequest } from '@/routes/password';
-import { Form, Head } from '@inertiajs/react';
+import { register } from '@/routes';
+import { Form, Head, Link } from '@inertiajs/react';
 
 type Props = {
     canResetPassword: boolean;
+    canRegister: boolean;
     status?: string;
 };
 
-export default function Login({ canResetPassword, status }: Props) {
+export default function Login({ canResetPassword, canRegister, status }: Props) {
     return (
         <>
             <Head title="Log in" />
@@ -96,6 +98,18 @@ export default function Login({ canResetPassword, status }: Props) {
                             >
                                 Log in
                             </Button>
+
+                            {canRegister && (
+                                <p className="text-center text-sm text-muted-foreground">
+                                    New student?{' '}
+                                    <Link
+                                        href={register().url}
+                                        className="font-medium text-foreground underline underline-offset-4"
+                                    >
+                                        Create an account
+                                    </Link>
+                                </p>
+                            )}
                         </>
                     )}
                 </Form>

@@ -5,6 +5,7 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            pendingStudentRegistrationCount: number;
             sidebarOpen: boolean;
             flash?: {
                 success?: string | null;
