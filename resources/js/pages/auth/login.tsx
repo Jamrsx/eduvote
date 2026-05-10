@@ -1,39 +1,47 @@
-import { Form, Head } from '@inertiajs/react';
+import AuthenticatedSessionController from '@/actions/Laravel/Fortify/Http/Controllers/AuthenticatedSessionController';
 import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
-import { register } from '@/routes';
-import { store } from '@/routes/login';
-import { request } from '@/routes/password';
+import { request as forgotPasswordRequest } from '@/routes/password';
+import { Form, Head } from '@inertiajs/react';
 
 type Props = {
-    status?: string;
     canResetPassword: boolean;
-    canRegister: boolean;
+    status?: string;
 };
 
-export default function Login({
-    status,
-    canResetPassword,
-    canRegister,
-}: Props) {
+export default function Login({ canResetPassword, status }: Props) {
     return (
         <>
             <Head title="Log in" />
 
-            <Form
-                {...store.form()}
-                resetOnSuccess={['password']}
-                className="flex flex-col gap-6"
-            >
-                {({ processing, errors }) => (
-                    <>
-                        <div className="grid gap-6">
+            <div className="space-y-6">
+                <div className="space-y-2 text-center">
+                    <h1 className="text-xl font-semibold tracking-tight">
+                        Log in to your account
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Enter your email and password below to continue.
+                    </p>
+                </div>
+
+                {status && (
+                    <div className="rounded-md bg-muted/80 px-3 py-2 text-center text-sm font-medium text-muted-foreground">
+                        {status}
+                    </div>
+                )}
+
+                <Form
+                    action={AuthenticatedSessionController.store.url()}
+                    method="post"
+                    resetOnSuccess={['password']}
+                    className="flex flex-col gap-6"
+                >
+                    {({ processing, errors }) => (
+                        <>
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email address</Label>
                                 <Input
@@ -43,27 +51,28 @@ export default function Login({
                                     required
                                     autoFocus
                                     tabIndex={1}
-                                    autoComplete="email"
+                                    autoComplete="username"
                                     placeholder="email@example.com"
                                 />
                                 <InputError message={errors.email} />
                             </div>
 
                             <div className="grid gap-2">
-                                <div className="flex items-center">
+                                <div className="flex items-center justify-between">
                                     <Label htmlFor="password">Password</Label>
                                     {canResetPassword && (
                                         <TextLink
-                                            href={request()}
-                                            className="ml-auto text-sm"
+                                            href={forgotPasswordRequest.url()}
+                                            className="text-sm"
                                             tabIndex={5}
                                         >
                                             Forgot password?
                                         </TextLink>
                                     )}
                                 </div>
-                                <PasswordInput
+                                <Input
                                     id="password"
+                                    type="password"
                                     name="password"
                                     required
                                     tabIndex={2}
@@ -74,11 +83,7 @@ export default function Login({
                             </div>
 
                             <div className="flex items-center space-x-3">
-                                <Checkbox
-                                    id="remember"
-                                    name="remember"
-                                    tabIndex={3}
-                                />
+                                <Checkbox id="remember" name="remember" tabIndex={3} />
                                 <Label htmlFor="remember">Remember me</Label>
                             </div>
 
@@ -89,33 +94,12 @@ export default function Login({
                                 disabled={processing}
                                 data-test="login-button"
                             >
-                                {processing && <Spinner />}
                                 Log in
                             </Button>
-                        </div>
-
-                        {canRegister && (
-                            <div className="text-center text-sm text-muted-foreground">
-                                Don't have an account?{' '}
-                                <TextLink href={register()} tabIndex={5}>
-                                    Sign up
-                                </TextLink>
-                            </div>
-                        )}
-                    </>
-                )}
-            </Form>
-
-            {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    {status}
-                </div>
-            )}
+                        </>
+                    )}
+                </Form>
+            </div>
         </>
     );
 }
-
-Login.layout = {
-    title: 'Log in to your account',
-    description: 'Enter your email and password below to log in',
-};

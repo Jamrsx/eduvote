@@ -18,6 +18,10 @@ createInertiaApp({
                 return AuthLayout;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
+            case name.startsWith('admin/'):
+                return AppLayout;
+            case name.startsWith('student/'):
+                return AppLayout;
             default:
                 return AppLayout;
         }

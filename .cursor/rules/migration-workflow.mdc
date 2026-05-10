@@ -1,0 +1,11 @@
+---
+description: How to handle database migrations and handoff to the maintainer
+alwaysApply: true
+---
+
+# Migration workflow (project preference)
+
+- When adding or changing schema: **write the migration(s)** and **verify during the task** (e.g. run `php artisan migrate` in this environment and run affected tests if present) so the migration is known-good before handoff.
+- The maintainer **runs migrations on their machine when they choose** (e.g. `php artisan migrate`). Do **not** assume they will run migrate immediately or rely on long step-by-step instructions unless they ask.
+- At the end of the task, give a **short “done” summary**. Avoid repeating “you should run migrate” unless they explicitly want deployment or ops notes.
+- Do **not** introduce or require a **separate MySQL test database** for PHPUnit (e.g. no `eduvote_testing`); keep test DB config aligned with project `phpunit.xml` (in-memory SQLite is fine when supported).

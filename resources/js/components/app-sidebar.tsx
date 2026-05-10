@@ -1,7 +1,7 @@
-import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { GraduationCap, LayoutGrid, Shield } from 'lucide-react';
+import { useMemo } from 'react';
 import AppLogo from '@/components/app-logo';
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -13,37 +13,52 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { dashboard as adminDashboard } from '@/routes/admin';
 import { dashboard } from '@/routes';
+import { dashboard as studentDashboard } from '@/routes/student';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
-
 export function AppSidebar() {
+    const { auth } = usePage().props;
+
+    const mainNavItems = useMemo((): NavItem[] => {
+        const items: NavItem[] = [
+            {
+                title: 'Dashboard',
+                href: dashboard(),
+                icon: LayoutGrid,
+            },
+        ];
+
+        if (auth.user?.role === 'admin') {
+            items.push({
+                title: 'Admin',
+                href: adminDashboard(),
+                icon: Shield,
+            });
+        }
+
+        if (auth.user?.role === 'student') {
+            items.push({
+                title: 'Student',
+                href: studentDashboard(),
+                icon: GraduationCap,
+            });
+        }
+
+        return items;
+    }, [auth.user?.role]);
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            tooltip={{ children: 'EduVote' }}
+                        >
                             <Link href={dashboard()} prefetch>
                                 <AppLogo />
                             </Link>
@@ -57,7 +72,6 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
