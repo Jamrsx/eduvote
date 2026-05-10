@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Voting\StudentBallotService;
 use App\Services\Voting\VoterEligibilityChecker;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -17,6 +18,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(VoterEligibilityChecker::class);
+        $this->app->singleton(StudentBallotService::class);
     }
 
     /**

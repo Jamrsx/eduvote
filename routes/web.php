@@ -8,6 +8,9 @@ use App\Http\Controllers\Admin\PartyController;
 use App\Http\Controllers\Admin\SchoolRosterController;
 use App\Http\Controllers\Admin\StudentAccountController;
 use App\Http\Controllers\Admin\StudentRegistrationApprovalController;
+use App\Http\Controllers\Student\StudentDashboardController;
+use App\Http\Controllers\Student\StudentOfficersController;
+use App\Http\Controllers\Student\VotingController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -86,12 +89,13 @@ Route::middleware(['auth', 'verified', 'student'])->prefix('student')->name('stu
         ],
     ]))->name('account-disabled');
 
-    Route::get('dashboard', fn () => Inertia::render('student/dashboard', [
-        'breadcrumbs' => [
-            ['title' => 'Student', 'href' => route('student.dashboard')],
-            ['title' => 'Dashboard', 'href' => route('student.dashboard')],
-        ],
-    ]))->name('dashboard');
+    Route::get('dashboard', StudentDashboardController::class)->name('dashboard');
+
+    Route::get('officers', [StudentOfficersController::class, 'index'])->name('officers.index');
+
+    Route::get('voting', [VotingController::class, 'index'])->name('voting.index');
+    Route::post('elections/{election}/ballot', [VotingController::class, 'store'])->name('elections.ballot.store');
+    Route::post('elections/{election}/ballot/progress', [VotingController::class, 'saveProgress'])->name('elections.ballot.progress');
 });
 
 require __DIR__.'/settings.php';

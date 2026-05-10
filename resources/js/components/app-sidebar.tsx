@@ -8,6 +8,8 @@ import {
     GraduationCap,
     LayoutGrid,
     Users,
+    UserSquare2,
+    Vote,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import AppLogo from '@/components/app-logo';
@@ -31,6 +33,8 @@ import { index as adminStudentsIndex } from '@/routes/admin/students';
 import { index as adminResultIndex } from '@/routes/admin/result';
 import { dashboard } from '@/routes';
 import { dashboard as studentDashboard } from '@/routes/student';
+import { index as studentOfficersIndex } from '@/routes/student/officers';
+import { index as studentVotingIndex } from '@/routes/student/voting';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
@@ -92,6 +96,16 @@ export function AppSidebar() {
                 title: 'Student',
                 href: studentDashboard(),
                 icon: GraduationCap,
+            },
+            {
+                title: 'Nominees',
+                href: studentOfficersIndex(),
+                icon: UserSquare2,
+            },
+            {
+                title: 'Vote',
+                href: studentVotingIndex(),
+                icon: Vote,
             },
         ],
         [],

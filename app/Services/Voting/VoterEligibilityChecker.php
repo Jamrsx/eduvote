@@ -25,14 +25,15 @@ final class VoterEligibilityChecker
 
         $profile = $voter->studentProfile;
         if ($profile === null) {
-            return false;
+            return $position->isCampusWide();
         }
 
         if ($position->isCampusWide()) {
             return true;
         }
 
-        return (int) $profile->course_id === (int) $position->course_id;
+        return $profile->course_id !== null
+            && (int) $profile->course_id === (int) $position->course_id;
     }
 
     /**
