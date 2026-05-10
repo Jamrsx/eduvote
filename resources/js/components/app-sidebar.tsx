@@ -28,7 +28,7 @@ import { index as adminCoursesIndex } from '@/routes/admin/courses';
 import { index as adminElectionsIndex } from '@/routes/admin/elections';
 import { index as adminRosterIndex } from '@/routes/admin/roster';
 import { index as adminStudentsIndex } from '@/routes/admin/students';
-import { index as adminVotingIndex } from '@/routes/admin/voting';
+import { index as adminResultIndex } from '@/routes/admin/result';
 import { dashboard } from '@/routes';
 import { dashboard as studentDashboard } from '@/routes/student';
 import type { NavItem } from '@/types';
@@ -64,8 +64,8 @@ export function AppSidebar() {
                 notificationDot: pendingRegistrationDot,
             },
             {
-                title: 'Result',
-                href: adminVotingIndex(),
+                title: 'Results',
+                href: adminResultIndex(),
                 icon: BarChart3,
             },
         ];

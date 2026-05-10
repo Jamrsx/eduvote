@@ -3,11 +3,11 @@
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\ElectionController;
+use App\Http\Controllers\Admin\ElectionResultController;
 use App\Http\Controllers\Admin\PartyController;
 use App\Http\Controllers\Admin\SchoolRosterController;
 use App\Http\Controllers\Admin\StudentAccountController;
 use App\Http\Controllers\Admin\StudentRegistrationApprovalController;
-use App\Http\Controllers\Admin\VotingActivityController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -63,7 +63,8 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::post('roster/import', [SchoolRosterController::class, 'import'])->name('roster.import');
     Route::delete('roster/{school_roster_entry}', [SchoolRosterController::class, 'destroy'])->name('roster.destroy');
     Route::get('imports', fn (): RedirectResponse => redirect()->route('admin.students.index'));
-    Route::get('voting', [VotingActivityController::class, 'index'])->name('voting.index');
+    Route::get('result', [ElectionResultController::class, 'index'])->name('result.index');
+    Route::get('voting', fn (): RedirectResponse => redirect()->route('admin.result.index'))->name('voting.index');
 });
 
 Route::middleware(['auth', 'verified', 'student'])->prefix('student')->name('student.')->group(function () {

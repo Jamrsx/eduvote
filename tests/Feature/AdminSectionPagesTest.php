@@ -14,10 +14,13 @@ test('admin can view admin section index pages', function () {
         'admin.students.accounts',
         'admin.roster.index',
         'admin.roster.master-list',
-        'admin.voting.index',
+        'admin.result.index',
     ] as $routeName) {
         $this->get(route($routeName))->assertOk();
     }
+
+    $this->get(route('admin.voting.index'))
+        ->assertRedirect(route('admin.result.index'));
 
     $this->get(route('admin.students.pending'))
         ->assertRedirect(route('admin.roster.index'));
@@ -35,7 +38,7 @@ test('students cannot view admin section index pages', function () {
         'admin.students.accounts',
         'admin.roster.index',
         'admin.roster.master-list',
-        'admin.voting.index',
+        'admin.result.index',
     ] as $routeName) {
         $this->get(route($routeName))->assertForbidden();
     }
