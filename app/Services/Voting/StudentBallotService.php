@@ -40,11 +40,40 @@ final class StudentBallotService
         $user->loadMissing(['studentProfile.course:id,code,name']);
 
         /** @var list<array<string, mixed>> */
-        return $this->openElectionsAcceptingVotes()
+        return $this->electionsVisibleForOfficersDirectory()
             ->map(fn (Election $election): array => $this->serializeElectionOfficersDirectory($user, $election))
             ->filter(static fn (array $card): bool => ($card['offices'] ?? []) !== [])
             ->values()
             ->all();
+    }
+
+    /**
+     * Scheduled and open elections: students may browse nominee lists before the vote window opens.
+     *
+     * @return Collection<int, Election>
+     */
+    private function electionsVisibleForOfficersDirectory(): Collection
+    {
+        return Election::query()
+            ->whereIn('status', [ElectionStatus::Scheduled, ElectionStatus::Open])
+            ->with([
+                'positions' => function ($query): void {
+                    $query
+                        ->with('course:id,code,name')
+                        ->orderBy('sort_order')
+                        ->orderBy('name')
+                        ->with([
+                            'candidates' => function ($cq): void {
+                                $cq->with('party:id,name,short_name,course_id,election_id,sort_order')
+                                    ->orderBy('sort_order')
+                                    ->orderBy('full_name');
+                            },
+                        ]);
+                },
+            ])
+            ->orderByDesc('closes_at')
+            ->get()
+            ->values();
     }
 
     /**
@@ -88,6 +117,7 @@ final class StudentBallotService
                     'id' => $card['id'],
                     'title' => $card['title'],
                     'description' => $card['description'],
+                    'opens_at_display' => $card['opens_at_display'] ?? null,
                     'closes_at_display' => $card['closes_at_display'],
                     'ballot_locked' => $card['ballot_locked'],
                     'status_label' => $card['ballot_locked'] === true
@@ -100,6 +130,54 @@ final class StudentBallotService
             },
             $this->buildElectionCardsFor($user),
         ));
+    }
+
+    /**
+     * Public voting schedule rows for the student dashboard.
+     *
+     * Lists every {@see ElectionStatus::Scheduled} election plus any
+     * {@see ElectionStatus::Open} election whose `opens_at` is in the future
+     * (so the window is announced even before the time block actually starts).
+     *
+     * Independent of candidate visibility on purpose: the goal is to show
+     * **when voting starts**, even if positions or nominees have not been
+     * filed yet for that student's program.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function buildDashboardUpcomingElectionSummariesFor(User $user): array
+    {
+        $user->loadMissing(['studentProfile.course:id,code,name']);
+
+        $elections = Election::query()
+            ->whereIn('status', [ElectionStatus::Scheduled, ElectionStatus::Open])
+            ->orderBy('opens_at')
+            ->orderBy('id')
+            ->get()
+            ->filter(static fn (Election $election): bool => ! $election->isAcceptingVotes())
+            ->values();
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = [];
+
+        foreach ($elections as $election) {
+            $rows[] = [
+                'id' => (int) $election->id,
+                'title' => $election->title,
+                'description' => $election->description,
+                'election_status' => $election->status->value,
+                'opens_at_display' => $election->opens_at !== null
+                    ? $election->opens_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
+                    : null,
+                'closes_at_display' => $election->closes_at !== null
+                    ? $election->closes_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
+                    : null,
+                'status_label' => 'Voting not open yet',
+                'status_detail' => 'Voting will open on the date shown. Review nominees and platforms on the Nominees page; cast your ballot on the Vote page once voting starts.',
+            ];
+        }
+
+        return $rows;
     }
 
     /** @throws ValidationException */
@@ -370,7 +448,7 @@ final class StudentBallotService
     /**
      * @return array<int, list<int>> position id => ordered candidate IDs the voter may select
      */
-    public function allowedCandidatesByPosition(User $user, Election $election): array
+    public function allowedCandidatesByPosition(User $user, Election $election, bool $forNomineeDirectoryListing = false): array
     {
         $election->loadMissing([
             'positions.course',
@@ -382,7 +460,10 @@ final class StudentBallotService
         $map = [];
 
         foreach ($election->positions as $position) {
-            if (! $this->eligibility->mayVoteForPosition($user, $position)) {
+            $maySee = $forNomineeDirectoryListing
+                ? $this->eligibility->mayViewNomineeDirectoryForPosition($user, $position)
+                : $this->eligibility->mayVoteForPosition($user, $position);
+            if (! $maySee) {
                 continue;
             }
 
@@ -482,7 +563,7 @@ final class StudentBallotService
             'positions.candidates.party:id,name,short_name,course_id,election_id,sort_order',
         ]);
 
-        $allowedMap = $this->allowedCandidatesByPosition($user, $election);
+        $allowedMap = $this->allowedCandidatesByPosition($user, $election, true);
 
         /** @var list<array<string, mixed>> $offices */
         $offices = [];
@@ -536,6 +617,11 @@ final class StudentBallotService
             'id' => $election->id,
             'title' => $election->title,
             'description' => $election->description,
+            'status' => $election->status->value,
+            'accepting_votes' => $election->isAcceptingVotes(),
+            'opens_at_display' => $election->opens_at !== null
+                ? $election->opens_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
+                : null,
             'closes_at_display' => $election->closes_at !== null
                 ? $election->closes_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
                 : null,
@@ -564,6 +650,9 @@ final class StudentBallotService
                 'id' => $election->id,
                 'title' => $election->title,
                 'description' => $election->description,
+                'opens_at_display' => $election->opens_at !== null
+                    ? $election->opens_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
+                    : null,
                 'closes_at_display' => $election->closes_at !== null
                     ? $election->closes_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
                     : null,
@@ -620,6 +709,9 @@ final class StudentBallotService
             'id' => $election->id,
             'title' => $election->title,
             'description' => $election->description,
+            'opens_at_display' => $election->opens_at !== null
+                ? $election->opens_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
+                : null,
             'closes_at_display' => $election->closes_at !== null
                 ? $election->closes_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
                 : null,

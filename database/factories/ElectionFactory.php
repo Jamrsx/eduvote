@@ -45,6 +45,15 @@ class ElectionFactory extends Factory
         ]);
     }
 
+    public function scheduled(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => ElectionStatus::Scheduled,
+            'opens_at' => now()->addDay(),
+            'closes_at' => now()->addWeek(),
+        ]);
+    }
+
     public function closed(): static
     {
         return $this->state(fn (array $attributes) => [

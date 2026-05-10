@@ -38,6 +38,14 @@ class Election extends Model
     }
 
     /**
+     * Whether students may browse the nominees directory (scheduled / open), independent of vote window.
+     */
+    public function allowsNomineeDirectoryListing(): bool
+    {
+        return ! in_array($this->status, [ElectionStatus::Draft, ElectionStatus::Closed], true);
+    }
+
+    /**
      * Whether voters may cast ballots at the given moment (status + time window).
      */
     public function isAcceptingVotes(?\DateTimeInterface $at = null): bool

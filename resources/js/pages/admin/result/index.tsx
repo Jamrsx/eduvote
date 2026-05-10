@@ -459,7 +459,7 @@ export default function AdminElectionResultsIndex({
                 </div>
 
                 {elections.length === 0 ? (
-                    <Card>
+                <Card>
                         <CardHeader className="flex flex-row items-start gap-3 space-y-0">
                             <BarChart3
                                 className="mt-0.5 size-5 shrink-0 text-muted-foreground"
@@ -469,14 +469,14 @@ export default function AdminElectionResultsIndex({
                                 <CardTitle className="text-base">
                                     No elections yet
                                 </CardTitle>
-                                <CardDescription>
+                        <CardDescription>
                                     Create an election under Election schedule,
                                     run voting, then close it to see results
                                     here.
-                                </CardDescription>
+                        </CardDescription>
                             </div>
-                        </CardHeader>
-                    </Card>
+                    </CardHeader>
+                </Card>
                 ) : (
                     <div className="flex flex-col gap-4">
                         {elections.map((election) => (

@@ -24,14 +24,14 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import { index as adminPartiesIndex } from '@/routes/admin/parties';
 import { index as adminCoursesIndex } from '@/routes/admin/courses';
 import { index as adminElectionsIndex } from '@/routes/admin/elections';
+import { index as adminPartiesIndex } from '@/routes/admin/parties';
+import { index as adminResultIndex } from '@/routes/admin/result';
 import { index as adminRosterIndex } from '@/routes/admin/roster';
 import { index as adminStudentsIndex } from '@/routes/admin/students';
-import { index as adminResultIndex } from '@/routes/admin/result';
-import { dashboard } from '@/routes';
 import { dashboard as studentDashboard } from '@/routes/student';
 import { index as studentOfficersIndex } from '@/routes/student/officers';
 import { index as studentVotingIndex } from '@/routes/student/voting';
@@ -39,6 +39,18 @@ import type { NavItem } from '@/types';
 
 export function AppSidebar() {
     const { auth, pendingStudentRegistrationCount } = usePage().props;
+
+    const sidebarBrandHref = useMemo(() => {
+        if (auth.user?.role === 'admin') {
+            return adminDashboard();
+        }
+
+        if (auth.user?.role === 'student') {
+            return studentDashboard();
+        }
+
+        return dashboard();
+    }, [auth.user?.role]);
 
     const adminCoreNavItems = useMemo((): NavItem[] => {
         const pendingRegistrationDot =
@@ -67,11 +79,6 @@ export function AppSidebar() {
                 icon: BookMarked,
                 notificationDot: pendingRegistrationDot,
             },
-            {
-                title: 'Results',
-                href: adminResultIndex(),
-                icon: BarChart3,
-            },
         ];
     }, [pendingStudentRegistrationCount]);
 
@@ -86,6 +93,11 @@ export function AppSidebar() {
                 title: 'Parties',
                 href: adminPartiesIndex().url,
                 icon: Flag,
+            },
+            {
+                title: 'Results',
+                href: adminResultIndex(),
+                icon: BarChart3,
             },
         ];
     }, []);
@@ -121,7 +133,7 @@ export function AppSidebar() {
                             asChild
                             tooltip={{ children: 'EduVote' }}
                         >
-                            <Link href={dashboard()} prefetch>
+                            <Link href={sidebarBrandHref} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>

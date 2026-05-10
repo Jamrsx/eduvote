@@ -26,6 +26,7 @@ class StudentDashboardController extends Controller
                 ['title' => 'Dashboard', 'href' => route('student.dashboard')],
             ],
             'election_summaries' => $ballots->buildDashboardElectionSummariesFor($user),
+            'upcoming_election_summaries' => $ballots->buildDashboardUpcomingElectionSummariesFor($user),
             'student_course_label' => $profile?->course !== null
                 ? "{$profile->course->code} — {$profile->course->name}"
                 : null,

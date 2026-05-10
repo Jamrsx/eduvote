@@ -1,4 +1,8 @@
+import { Head, Link } from '@inertiajs/react';
+import { UsersRound } from 'lucide-react';
+import { useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import {
     Card,
     CardContent,
@@ -6,10 +10,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Head, Link } from '@inertiajs/react';
 import { index as studentVotingIndex } from '@/routes/student/voting';
-import { UsersRound } from 'lucide-react';
-import { useEffect } from 'react';
 
 type DirectoryNominee = {
     full_name: string;
@@ -31,6 +32,9 @@ type OfficersElection = {
     id: number;
     title: string;
     description: string | null;
+    status: string;
+    accepting_votes: boolean;
+    opens_at_display: string | null;
     closes_at_display: string | null;
     offices: DirectoryOffice[];
 };
@@ -43,9 +47,11 @@ type Props = {
 
 function chunkPairs<T>(items: T[]): T[][] {
     const rows: T[][] = [];
+
     for (let i = 0; i < items.length; i += 2) {
         rows.push(items.slice(i, i + 2));
     }
+
     return rows;
 }
 
@@ -145,7 +151,9 @@ export default function StudentOfficersIndex({
                             your program
                         </span>
                         {' — '}
-                        the same slate you see when you vote.
+                        the same slate you see when you vote. Scheduled
+                        elections show nominees early; you can vote only when
+                        voting is open.
                     </p>
                     {student_course_label ? (
                         <p className="text-muted-foreground text-xs">
@@ -191,9 +199,10 @@ export default function StudentOfficersIndex({
                                 </CardTitle>
                             </div>
                             <CardDescription>
-                                Nominees appear while an election is open and
-                                accepting votes and you have ballot lines on
-                                your account.
+                                Nominees appear when an election is scheduled
+                                or open (and accepting votes once the window
+                                starts) and you have ballot lines on your
+                                account.
                             </CardDescription>
                         </CardHeader>
                     </Card>
@@ -205,13 +214,34 @@ export default function StudentOfficersIndex({
                                 className="border-border/70"
                             >
                                 <CardHeader className="space-y-1 pb-3">
-                                    <CardTitle className="text-base font-semibold tracking-tight">
-                                        {election.title}
-                                    </CardTitle>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <CardTitle className="text-base font-semibold tracking-tight">
+                                            {election.title}
+                                        </CardTitle>
+                                        {!election.accepting_votes ? (
+                                            <Badge
+                                                variant="outline"
+                                                className="border-amber-600/35 bg-amber-600/10 text-amber-950 text-xs dark:text-amber-100"
+                                            >
+                                                {election.status ===
+                                                'scheduled'
+                                                    ? 'Upcoming'
+                                                    : 'Not accepting votes'}
+                                            </Badge>
+                                        ) : null}
+                                    </div>
                                     {election.description ? (
                                         <CardDescription className="text-xs">
                                             {election.description}
                                         </CardDescription>
+                                    ) : null}
+                                    {election.opens_at_display ? (
+                                        <p className="text-muted-foreground text-xs">
+                                            Voting opens{' '}
+                                            <span className="text-foreground font-medium">
+                                                {election.opens_at_display}
+                                            </span>
+                                        </p>
                                     ) : null}
                                     {election.closes_at_display ? (
                                         <p className="text-muted-foreground text-xs">
@@ -223,6 +253,19 @@ export default function StudentOfficersIndex({
                                     ) : null}
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-6 px-4 pb-5 pt-0 sm:px-6">
+                                    {!election.accepting_votes ? (
+                                        <Alert>
+                                            <AlertTitle>
+                                                Preview — not voting yet
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                Review nominees and platforms
+                                                below. When voting opens, use
+                                                the Vote page to cast your
+                                                ballot.
+                                            </AlertDescription>
+                                        </Alert>
+                                    ) : null}
                                     {election.offices.map((office) => (
                                         <section
                                             key={office.position_id}

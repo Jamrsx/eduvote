@@ -10,16 +10,37 @@ use App\Models\User;
 final class VoterEligibilityChecker
 {
     /**
+     * Same campus/program ballot lines as voting, without requiring the voting window ({@see Election::isAcceptingVotes()}).
+     *
+     * Used for the read-only nominees / officers directory so scheduled elections show slates early.
+     */
+    public function mayViewNomineeDirectoryForPosition(User $voter, Position $position): bool
+    {
+        if (! $this->studentMaySeePositionBallotLines($voter, $position)) {
+            return false;
+        }
+
+        return $position->election->allowsNomineeDirectoryListing();
+    }
+
+    /**
      * Whether the voter may cast a ballot for this position (campus vs department rules).
      */
     public function mayVoteForPosition(User $voter, Position $position): bool
     {
-        if ($voter->role !== UserRole::Student) {
+        if (! $this->studentMaySeePositionBallotLines($voter, $position)) {
             return false;
         }
 
-        $election = $position->election;
-        if (! $election->isAcceptingVotes()) {
+        return $position->election->isAcceptingVotes();
+    }
+
+    /**
+     * Campus-wide vs program position rows for students (student profile affects program-only offices).
+     */
+    private function studentMaySeePositionBallotLines(User $voter, Position $position): bool
+    {
+        if ($voter->role !== UserRole::Student) {
             return false;
         }
 
