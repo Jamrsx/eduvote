@@ -13,6 +13,7 @@ use App\Models\Election;
 use App\Models\Party;
 use App\Models\Position;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -83,6 +84,9 @@ class PartyController extends Controller
                         ),
                         'platform' => $candidate->platform,
                         'candidate_course_id' => $candidate->course_id,
+                        'photo_url' => $candidate->photo_path !== null
+                            ? Storage::disk('public')->url($candidate->photo_path)
+                            : null,
                     ])->values()->all(),
                 ])->values()->all(),
             ])
@@ -152,7 +156,8 @@ class PartyController extends Controller
 
         $sortOrder = (int) ($position->candidates()->max('sort_order') ?? -1) + 1;
 
-        $position->candidates()->create([
+        /** @var Candidate $candidate */
+        $candidate = $position->candidates()->create([
             'election_id' => $election->id,
             'full_name' => $data['full_name'],
             'platform' => $data['platform'] ?? null,
@@ -160,6 +165,11 @@ class PartyController extends Controller
             'party_id' => $party->id,
             'sort_order' => $sortOrder,
         ]);
+
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store("candidate-photos/{$candidate->id}", 'public');
+            $candidate->update(['photo_path' => $path]);
+        }
 
         return redirect()->route('admin.parties.index')->with('success', 'Nominee added to this party slate.');
     }
@@ -183,12 +193,22 @@ class PartyController extends Controller
             $courseId = $party->course_id;
         }
 
-        $candidate->update([
+        $update = [
             'position_id' => $position->id,
             'full_name' => $data['full_name'],
             'platform' => $data['platform'] ?? null,
             'course_id' => $courseId,
-        ]);
+        ];
+
+        if ($request->hasFile('photo')) {
+            self::deleteCandidateStoredPhoto($candidate->photo_path);
+            $update['photo_path'] = $request->file('photo')->store("candidate-photos/{$candidate->id}", 'public');
+        } elseif ($request->boolean('clear_photo')) {
+            self::deleteCandidateStoredPhoto($candidate->photo_path);
+            $update['photo_path'] = null;
+        }
+
+        $candidate->update($update);
 
         return redirect()->route('admin.parties.index')->with('success', 'Nominee updated.');
     }
@@ -208,6 +228,7 @@ class PartyController extends Controller
                 ]);
         }
 
+        self::deleteCandidateStoredPhoto($candidate->photo_path);
         $candidate->delete();
 
         return redirect()->route('admin.parties.index')->with('success', 'Nominee removed.');
@@ -243,5 +264,14 @@ class PartyController extends Controller
         }
 
         return "{$course->code} — {$course->name}";
+    }
+
+    private static function deleteCandidateStoredPhoto(?string $path): void
+    {
+        if ($path === null || $path === '') {
+            return;
+        }
+
+        Storage::disk('public')->delete($path);
     }
 }

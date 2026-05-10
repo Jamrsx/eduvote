@@ -48,6 +48,8 @@ class UpdatePartySlateCandidateRequest extends FormRequest
             'full_name' => ['required', 'string', 'max:255'],
             'platform' => ['nullable', 'string', 'max:5000'],
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
+            'photo' => ['nullable', 'image', 'max:3072', 'mimes:jpeg,jpg,png,gif,webp'],
+            'clear_photo' => ['sometimes', 'boolean'],
         ];
     }
 

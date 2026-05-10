@@ -20,6 +20,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    compressNomineePhotoIfNeeded,
+    NOMINEE_PHOTO_MAX_BYTES,
+} from '@/lib/compress-nominee-photo';
 import { cn } from '@/lib/utils';
 import { Form, Head, usePage } from '@inertiajs/react';
 import { ChevronDown, Flag, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -39,6 +43,7 @@ type CandidateOnParty = {
     department: string;
     platform: string | null;
     candidate_course_id: number | null;
+    photo_url: string | null;
 };
 
 type PartyRow = {
@@ -177,6 +182,15 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
         party: PartyRow;
         nominee: CandidateOnParty;
     } | null>(null);
+
+    const [nomineePhotoCompressing, setNomineePhotoCompressing] =
+        useState(false);
+
+    useEffect(() => {
+        if (slateNomineeDialog === null) {
+            setNomineePhotoCompressing(false);
+        }
+    }, [slateNomineeDialog]);
 
     const partyListSignature = useMemo(
         () => partyIdsSignature(elections),
@@ -507,9 +521,12 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                                                     this slate.
                                                                 </p>
                                                             ) : (
-                                                                <table className="w-full min-w-[760px] text-sm">
+                                                                <table className="w-full min-w-[820px] text-sm">
                                                                     <thead>
                                                                         <tr className="border-b text-left">
+                                                                            <th className="w-14 px-2 py-2 font-medium">
+                                                                                Photo
+                                                                            </th>
                                                                             <th className="px-2 py-2 font-medium">
                                                                                 Candidate
                                                                             </th>
@@ -546,6 +563,23 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                                                                     }
                                                                                     className="border-b border-border/80 last:border-0"
                                                                                 >
+                                                                                    <td className="px-2 py-2">
+                                                                                        {row.photo_url ? (
+                                                                                            <img
+                                                                                                src={
+                                                                                                    row.photo_url
+                                                                                                }
+                                                                                                alt={
+                                                                                                    row.full_name
+                                                                                                }
+                                                                                                className="size-10 rounded-md object-cover ring-1 ring-border"
+                                                                                            />
+                                                                                        ) : (
+                                                                                            <span className="text-xs text-muted-foreground">
+                                                                                                —
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </td>
                                                                                     <td className="px-2 py-2 font-medium">
                                                                                         {
                                                                                             row.full_name
@@ -889,11 +923,7 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                               },
                                           )
                                 }
-                                method={
-                                    slateNomineeDialog.mode === 'create'
-                                        ? 'post'
-                                        : 'patch'
-                                }
+                                method="post"
                                 options={{ preserveScroll: true }}
                                 onSuccess={() => {
                                     console.log(
@@ -905,6 +935,13 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                             >
                                 {({ processing, errors }) => (
                                     <>
+                                        {slateNomineeDialog.mode === 'edit' ? (
+                                            <input
+                                                type="hidden"
+                                                name="_method"
+                                                value="patch"
+                                            />
+                                        ) : null}
                                         <div className="grid gap-2">
                                             <Label htmlFor="nominee_role">
                                                 Position / role (title)
@@ -977,6 +1014,130 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                                 message={errors.platform}
                                             />
                                         </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="nominee_photo">
+                                                Photo{' '}
+                                                <span className="font-normal text-muted-foreground">
+                                                    (optional)
+                                                </span>
+                                            </Label>
+                                            {slateNomineeDialog.mode ===
+                                                'edit' &&
+                                            slateNomineeDialog.nominee
+                                                .photo_url ? (
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <img
+                                                        src={
+                                                            slateNomineeDialog
+                                                                .nominee
+                                                                .photo_url ?? ''
+                                                        }
+                                                        alt={
+                                                            slateNomineeDialog
+                                                                .nominee
+                                                                .full_name
+                                                        }
+                                                        className="size-16 rounded-md object-cover ring-1 ring-border"
+                                                    />
+                                                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            name="clear_photo"
+                                                            value="1"
+                                                            className="size-4 rounded border border-input"
+                                                        />
+                                                        Remove current photo
+                                                    </label>
+                                                </div>
+                                            ) : null}
+                                            <Input
+                                                id="nominee_photo"
+                                                name="photo"
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                                disabled={
+                                                    nomineePhotoCompressing ||
+                                                    processing
+                                                }
+                                                onChange={async (event) => {
+                                                    const input =
+                                                        event.currentTarget;
+                                                    const chosen =
+                                                        input.files?.[0];
+                                                    if (!chosen) {
+                                                        return;
+                                                    }
+                                                    if (
+                                                        chosen.size <=
+                                                        NOMINEE_PHOTO_MAX_BYTES
+                                                    ) {
+                                                        return;
+                                                    }
+                                                    setNomineePhotoCompressing(
+                                                        true,
+                                                    );
+                                                    try {
+                                                        const compressed =
+                                                            await compressNomineePhotoIfNeeded(
+                                                                chosen,
+                                                            );
+                                                        const dt =
+                                                            new DataTransfer();
+                                                        dt.items.add(
+                                                            compressed,
+                                                        );
+                                                        input.files = dt.files;
+                                                        console.log(
+                                                            '[AdminPartiesIndex] nominee photo after compress attempt',
+                                                            chosen.size,
+                                                            '→',
+                                                            compressed.size,
+                                                        );
+                                                        if (
+                                                            compressed.size >
+                                                            NOMINEE_PHOTO_MAX_BYTES
+                                                        ) {
+                                                            toast.error(
+                                                                'This image is still over 3 MB after compression. Choose a smaller file.',
+                                                            );
+                                                            input.value = '';
+                                                        }
+                                                    } catch (err) {
+                                                        console.log(
+                                                            '[AdminPartiesIndex] nominee photo compress error',
+                                                            err,
+                                                        );
+                                                        toast.error(
+                                                            'Could not process this image.',
+                                                        );
+                                                        input.value = '';
+                                                    } finally {
+                                                        setNomineePhotoCompressing(
+                                                            false,
+                                                        );
+                                                    }
+                                                }}
+                                                className="cursor-pointer text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:text-primary-foreground file:hover:bg-primary/90"
+                                            />
+                                            {nomineePhotoCompressing ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Compressing image so it fits
+                                                    the 3 MB limit…
+                                                </p>
+                                            ) : null}
+                                            <p className="text-xs text-muted-foreground">
+                                                JPEG, PNG, GIF, or WebP · max 3
+                                                MB (large images are compressed
+                                                in the browser) · run{' '}
+                                                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.7rem]">
+                                                    php artisan storage:link
+                                                </code>{' '}
+                                                so uploads are visible.
+                                            </p>
+                                            <InputError
+                                                message={errors.photo}
+                                            />
+                                        </div>
                                         {slateNomineeDialog.party.course_id ===
                                         null ? (
                                             <div className="grid gap-2">
@@ -1044,14 +1205,19 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                             </Button>
                                             <Button
                                                 type="submit"
-                                                disabled={processing}
+                                                disabled={
+                                                    processing ||
+                                                    nomineePhotoCompressing
+                                                }
                                             >
-                                                {processing
-                                                    ? 'Saving…'
-                                                    : slateNomineeDialog.mode ===
-                                                        'create'
-                                                      ? 'Add nominee'
-                                                      : 'Save nominee'}
+                                                {nomineePhotoCompressing
+                                                    ? 'Compressing…'
+                                                    : processing
+                                                      ? 'Saving…'
+                                                      : slateNomineeDialog.mode ===
+                                                          'create'
+                                                        ? 'Add nominee'
+                                                        : 'Save nominee'}
                                             </Button>
                                         </DialogFooter>
                                     </>

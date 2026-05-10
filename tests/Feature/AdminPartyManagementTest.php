@@ -6,6 +6,8 @@ use App\Models\Election;
 use App\Models\Party;
 use App\Models\Position;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 test('admin can visit parties index', function () {
     $admin = User::factory()->admin()->create();
@@ -118,6 +120,78 @@ test('program party nominee uses free-text role and creates dept ballot line', f
     expect($candidate)->not->toBeNull()
         ->and((int) $candidate->course_id)->toBe((int) $course->id)
         ->and((int) $candidate->party_id)->toBe((int) $party->id);
+});
+
+test('admin can add nominee with photo stored on public disk', function () {
+    Storage::fake('public');
+
+    $admin = User::factory()->admin()->create();
+    $election = Election::factory()->draft()->create();
+    $party = Party::factory()->create([
+        'election_id' => $election->id,
+        'course_id' => null,
+        'name' => 'Vision Slate',
+    ]);
+
+    $photo = UploadedFile::fake()->image('nominee-portrait.jpg', 120, 120);
+
+    $this->actingAs($admin)
+        ->post(route('admin.elections.parties.candidates.store', [$election, $party]), [
+            'position_name' => 'Secretary',
+            'full_name' => 'Taylor Photo',
+            'photo' => $photo,
+        ])
+        ->assertRedirect(route('admin.parties.index'));
+
+    $candidate = Candidate::query()
+        ->where('party_id', $party->id)
+        ->where('full_name', 'Taylor Photo')
+        ->first();
+
+    expect($candidate)->not->toBeNull()
+        ->and($candidate->photo_path)->not->toBeNull()
+        ->and(Storage::disk('public')->exists((string) $candidate->photo_path))->toBeTrue();
+});
+
+test('admin can update nominee with file using post and method spoof so fields are readable', function () {
+    Storage::fake('public');
+
+    $admin = User::factory()->admin()->create();
+    $election = Election::factory()->draft()->create();
+    $party = Party::factory()->create([
+        'election_id' => $election->id,
+        'course_id' => null,
+    ]);
+
+    $position = Position::factory()->create([
+        'election_id' => $election->id,
+        'name' => 'President',
+        'course_id' => null,
+        'sort_order' => 0,
+    ]);
+
+    $candidate = Candidate::factory()->forBallot($election, $position)->create([
+        'party_id' => $party->id,
+        'full_name' => 'Althian James',
+    ]);
+
+    $photo = UploadedFile::fake()->image('nominee-photo.jpg');
+
+    $this->actingAs($admin)
+        ->post(route('admin.elections.parties.candidates.update', [$election, $party, $candidate]), [
+            '_method' => 'PATCH',
+            'position_name' => 'President',
+            'full_name' => 'Althian James',
+            'platform' => 'Updated platform text',
+            'photo' => $photo,
+        ])
+        ->assertRedirect(route('admin.parties.index'));
+
+    $fresh = $candidate->fresh();
+
+    expect($fresh->platform)->toBe('Updated platform text')
+        ->and($fresh->photo_path)->not->toBeNull()
+        ->and(Storage::disk('public')->exists((string) $fresh->photo_path))->toBeTrue();
 });
 
 test('campus-wide party nominee creates campus ballot line from role text', function () {
