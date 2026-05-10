@@ -26,10 +26,7 @@ import { index as adminStudentsIndex } from '@/routes/admin/students';
 import { ChevronDown, Layers, Mail } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    accentButtonOutline,
-    accentButtonSolid,
-} from '@/lib/admin-accent';
+import { accentButtonOutline, accentButtonSolid } from '@/lib/admin-accent';
 import { cn } from '@/lib/utils';
 
 type CourseSummary = {
@@ -64,7 +61,9 @@ type Props = {
 function SendAccountButton({ userId }: { userId: number }) {
     return (
         <Form
-            action={StudentAccountController.emailStudentCredentials.url(userId)}
+            action={StudentAccountController.emailStudentCredentials.url(
+                userId,
+            )}
             method="post"
             options={{ preserveScroll: true }}
             onSuccess={() =>
@@ -79,7 +78,7 @@ function SendAccountButton({ userId }: { userId: number }) {
                     size="sm"
                     className={cn(
                         accentButtonOutline,
-                        'h-7 whitespace-nowrap px-2 text-xs',
+                        'h-7 px-2 text-xs whitespace-nowrap',
                     )}
                     disabled={processing}
                 >
@@ -105,7 +104,7 @@ function DisableAccountButton({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10 h-7 whitespace-nowrap"
+                className="h-7 border-destructive/40 px-2 text-xs whitespace-nowrap text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive-foreground"
                 onClick={() => {
                     console.log(
                         '[AdminStudentAccounts] disable dialog open',
@@ -119,23 +118,23 @@ function DisableAccountButton({
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>
-                            Disable this student account?
-                        </DialogTitle>
+                        <DialogTitle>Disable this student account?</DialogTitle>
                         <DialogDescription className="space-y-2 pt-1">
                             <span className="block">
                                 <span className="font-medium text-foreground">
                                     {studentName}
                                 </span>{' '}
-                                will not be able to use student features until an
-                                administrator enables the account again.
+                                will not be able to use student features until
+                                an administrator enables the account again.
                             </span>
                         </DialogDescription>
                     </DialogHeader>
                     <Form
-                        action={StudentAccountController.disableStudentAccount.url({
-                            user: userId,
-                        })}
+                        action={StudentAccountController.disableStudentAccount.url(
+                            {
+                                user: userId,
+                            },
+                        )}
                         method="post"
                         options={{ preserveScroll: true }}
                         onSuccess={() => {
@@ -161,7 +160,9 @@ function DisableAccountButton({
                                     variant="destructive"
                                     disabled={processing}
                                 >
-                                    {processing ? 'Disabling…' : 'Disable account'}
+                                    {processing
+                                        ? 'Disabling…'
+                                        : 'Disable account'}
                                 </Button>
                             </DialogFooter>
                         )}
@@ -192,7 +193,7 @@ function EnableAccountButton({ userId }: { userId: number }) {
                     size="sm"
                     className={cn(
                         accentButtonOutline,
-                        'h-7 whitespace-nowrap px-2 text-xs',
+                        'h-7 px-2 text-xs whitespace-nowrap',
                     )}
                     disabled={processing}
                 >
@@ -207,10 +208,7 @@ function ActiveStudentActions({ row }: { row: StudentAccountRow }) {
     return (
         <div className="flex flex-wrap justify-end gap-1">
             <SendAccountButton userId={row.id} />
-            <DisableAccountButton
-                userId={row.id}
-                studentName={row.name}
-            />
+            <DisableAccountButton userId={row.id} studentName={row.name} />
         </div>
     );
 }
@@ -280,14 +278,11 @@ export default function AdminStudentAccounts({
                         <h1 className="text-base font-semibold tracking-tight">
                             Student accounts
                         </h1>
-                        <p className="text-muted-foreground text-xs leading-snug">
+                        <p className="text-xs leading-snug text-muted-foreground">
                             Grouped by program. {totalStudents} active student
                             account{totalStudents === 1 ? '' : 's'}.
                             {disabledStudents.length > 0 ? (
-                                <>
-                                    {' '}
-                                    {disabledStudents.length} disabled.
-                                </>
+                                <> {disabledStudents.length} disabled.</>
                             ) : null}
                         </p>
                     </div>
@@ -306,7 +301,10 @@ export default function AdminStudentAccounts({
                             type="button"
                             variant="default"
                             size="sm"
-                            className={cn(accentButtonSolid, 'h-8 gap-1.5 text-xs')}
+                            className={cn(
+                                accentButtonSolid,
+                                'h-8 gap-1.5 text-xs',
+                            )}
                             disabled={totalStudents === 0}
                             onClick={() => {
                                 console.log(
@@ -334,15 +332,13 @@ export default function AdminStudentAccounts({
                                     new password, and the sign-in link to that
                                     student&apos;s inbox.
                                 </span>
-                                <span className="text-destructive block font-medium">
+                                <span className="block font-medium text-destructive">
                                     Existing passwords stop working immediately.
                                 </span>
                             </DialogDescription>
                         </DialogHeader>
                         <Form
-                            action={
-                                StudentAccountController.emailCredentialsToAll.url()
-                            }
+                            action={StudentAccountController.emailCredentialsToAll.url()}
                             method="post"
                             options={{ preserveScroll: true }}
                             onSuccess={() => {
@@ -358,9 +354,7 @@ export default function AdminStudentAccounts({
                                         type="button"
                                         variant="outline"
                                         className={accentButtonOutline}
-                                        onClick={() =>
-                                            setEmailAllOpen(false)
-                                        }
+                                        onClick={() => setEmailAllOpen(false)}
                                     >
                                         Cancel
                                     </Button>
@@ -406,7 +400,7 @@ export default function AdminStudentAccounts({
                                                 </span>{' '}
                                                 <span>{course.name}</span>
                                             </p>
-                                            <p className="text-muted-foreground mt-0.5 text-[11px]">
+                                            <p className="mt-0.5 text-[11px] text-muted-foreground">
                                                 {count} student
                                                 {count === 1 ? '' : 's'}
                                             </p>
@@ -422,16 +416,16 @@ export default function AdminStudentAccounts({
                                     />
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
-                                    <CardContent className="px-3 pb-2 pt-0">
+                                    <CardContent className="px-3 pt-0 pb-2">
                                         {students.length === 0 ? (
-                                            <p className="text-muted-foreground pb-2 text-xs">
+                                            <p className="pb-2 text-xs text-muted-foreground">
                                                 No students in this program yet.
                                             </p>
                                         ) : (
                                             <div className="overflow-x-auto rounded border">
                                                 <table className="w-full min-w-[640px] text-xs">
                                                     <thead>
-                                                        <tr className="bg-muted/50 border-b text-left">
+                                                        <tr className="border-b bg-muted/50 text-left">
                                                             <th className="px-2 py-1 font-medium">
                                                                 Name
                                                             </th>
@@ -450,7 +444,7 @@ export default function AdminStudentAccounts({
                                                             <th className="px-2 py-1 font-medium">
                                                                 Registered
                                                             </th>
-                                                            <th className="text-muted-foreground w-[1%] px-2 py-1 text-right font-medium whitespace-nowrap">
+                                                            <th className="w-[1%] px-2 py-1 text-right font-medium whitespace-nowrap text-muted-foreground">
                                                                 Actions
                                                             </th>
                                                         </tr>
@@ -467,25 +461,27 @@ export default function AdminStudentAccounts({
                                                                 <td className="max-w-[12rem] truncate px-2 py-1 align-middle">
                                                                     {row.email}
                                                                 </td>
-                                                                <td className="font-mono px-2 py-1 align-middle text-[11px]">
+                                                                <td className="px-2 py-1 align-middle font-mono text-[11px]">
                                                                     {row.student_id ??
                                                                         '—'}
                                                                 </td>
-                                                                <td className="text-muted-foreground px-2 py-1 align-middle">
+                                                                <td className="px-2 py-1 align-middle text-muted-foreground">
                                                                     {row.section ??
                                                                         '—'}
                                                                 </td>
-                                                                <td className="text-muted-foreground px-2 py-1 align-middle">
+                                                                <td className="px-2 py-1 align-middle text-muted-foreground">
                                                                     {row.year_level ??
                                                                         '—'}
                                                                 </td>
-                                                                <td className="text-muted-foreground whitespace-nowrap px-2 py-1 align-middle">
+                                                                <td className="px-2 py-1 align-middle whitespace-nowrap text-muted-foreground">
                                                                     {row.registered_at ??
                                                                         '—'}
                                                                 </td>
-                                                                <td className="px-2 py-1 align-middle text-right">
+                                                                <td className="px-2 py-1 text-right align-middle">
                                                                     <ActiveStudentActions
-                                                                        row={row}
+                                                                        row={
+                                                                            row
+                                                                        }
                                                                     />
                                                                 </td>
                                                             </tr>
@@ -508,15 +504,15 @@ export default function AdminStudentAccounts({
                                 Disabled accounts ({disabledStudents.length})
                             </CardTitle>
                             <CardDescription className="text-[11px] leading-snug">
-                                These students cannot sign in to student features.
-                                Enable an account to restore access.
+                                These students cannot sign in to student
+                                features. Enable an account to restore access.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="px-3 pb-3 pt-0">
+                        <CardContent className="px-3 pt-0 pb-3">
                             <div className="overflow-x-auto rounded border">
                                 <table className="w-full min-w-[560px] text-xs">
                                     <thead>
-                                        <tr className="bg-muted/50 border-b text-left">
+                                        <tr className="border-b bg-muted/50 text-left">
                                             <th className="px-2 py-1 font-medium">
                                                 Name
                                             </th>
@@ -529,7 +525,7 @@ export default function AdminStudentAccounts({
                                             <th className="px-2 py-1 font-medium">
                                                 Registered
                                             </th>
-                                            <th className="text-muted-foreground w-[1%] px-2 py-1 text-right font-medium whitespace-nowrap">
+                                            <th className="w-[1%] px-2 py-1 text-right font-medium whitespace-nowrap text-muted-foreground">
                                                 Actions
                                             </th>
                                         </tr>
@@ -546,13 +542,13 @@ export default function AdminStudentAccounts({
                                                 <td className="max-w-[12rem] truncate px-2 py-1 align-middle">
                                                     {row.email}
                                                 </td>
-                                                <td className="font-mono px-2 py-1 align-middle text-[11px]">
+                                                <td className="px-2 py-1 align-middle font-mono text-[11px]">
                                                     {row.student_id ?? '—'}
                                                 </td>
-                                                <td className="text-muted-foreground whitespace-nowrap px-2 py-1 align-middle">
+                                                <td className="px-2 py-1 align-middle whitespace-nowrap text-muted-foreground">
                                                     {row.registered_at ?? '—'}
                                                 </td>
-                                                <td className="px-2 py-1 align-middle text-right">
+                                                <td className="px-2 py-1 text-right align-middle">
                                                     <EnableAccountButton
                                                         userId={row.id}
                                                     />
@@ -574,14 +570,15 @@ export default function AdminStudentAccounts({
                             </CardTitle>
                             <CardDescription className="text-[11px] leading-snug">
                                 These accounts are missing a profile or program.
-                                Assign them from registration or fix import data.
+                                Assign them from registration or fix import
+                                data.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="px-3 pb-3 pt-0">
+                        <CardContent className="px-3 pt-0 pb-3">
                             <div className="overflow-x-auto rounded border">
                                 <table className="w-full min-w-[580px] text-xs">
                                     <thead>
-                                        <tr className="bg-muted/50 border-b text-left">
+                                        <tr className="border-b bg-muted/50 text-left">
                                             <th className="px-2 py-1 font-medium">
                                                 Name
                                             </th>
@@ -594,7 +591,7 @@ export default function AdminStudentAccounts({
                                             <th className="px-2 py-1 font-medium">
                                                 Registered
                                             </th>
-                                            <th className="text-muted-foreground w-[1%] px-2 py-1 text-right font-medium whitespace-nowrap">
+                                            <th className="w-[1%] px-2 py-1 text-right font-medium whitespace-nowrap text-muted-foreground">
                                                 Actions
                                             </th>
                                         </tr>
@@ -611,13 +608,13 @@ export default function AdminStudentAccounts({
                                                 <td className="max-w-[12rem] truncate px-2 py-1 align-middle">
                                                     {row.email}
                                                 </td>
-                                                <td className="font-mono px-2 py-1 align-middle text-[11px]">
+                                                <td className="px-2 py-1 align-middle font-mono text-[11px]">
                                                     {row.student_id ?? '—'}
                                                 </td>
-                                                <td className="text-muted-foreground whitespace-nowrap px-2 py-1 align-middle">
+                                                <td className="px-2 py-1 align-middle whitespace-nowrap text-muted-foreground">
                                                     {row.registered_at ?? '—'}
                                                 </td>
-                                                <td className="px-2 py-1 align-middle text-right">
+                                                <td className="px-2 py-1 text-right align-middle">
                                                     <ActiveStudentActions
                                                         row={row}
                                                     />

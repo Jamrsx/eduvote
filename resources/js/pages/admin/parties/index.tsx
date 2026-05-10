@@ -22,8 +22,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Form, Head, usePage } from '@inertiajs/react';
-import { Flag, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ChevronDown, Flag, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 type CourseOption = {
@@ -65,9 +65,69 @@ type Props = {
 };
 
 const selectClasses = cn(
-    'border-input placeholder:text-muted-foreground flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none',
-    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none placeholder:text-muted-foreground',
+    'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
 );
+
+const PARTY_SLATE_EXPAND_STORAGE_KEY =
+    'eduvote.admin_parties.party_slates_open';
+
+/** partyId → slate body visible (default true when missing). */
+type PartySlateOpenMap = Record<number, boolean>;
+
+function partyIdsSignature(electionBlocks: ElectionBlock[]): string {
+    return electionBlocks
+        .flatMap((e) => e.parties.map((p) => p.id))
+        .sort((a, b) => a - b)
+        .join(',');
+}
+
+function readPartySlateOpenMapFromStorage(): PartySlateOpenMap {
+    if (typeof window === 'undefined') {
+        return {};
+    }
+    try {
+        const raw = window.localStorage.getItem(PARTY_SLATE_EXPAND_STORAGE_KEY);
+        if (!raw) {
+            return {};
+        }
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const out: PartySlateOpenMap = {};
+        for (const [key, val] of Object.entries(parsed)) {
+            const id = Number(key);
+            if (Number.isFinite(id) && typeof val === 'boolean') {
+                out[id] = val;
+            }
+        }
+        return out;
+    } catch {
+        return {};
+    }
+}
+
+function writePartySlateOpenMapToStorage(map: PartySlateOpenMap): void {
+    try {
+        window.localStorage.setItem(
+            PARTY_SLATE_EXPAND_STORAGE_KEY,
+            JSON.stringify(map),
+        );
+    } catch {
+        // ignore quota / private mode
+    }
+}
+
+function mergePartySlateOpenMap(
+    electionBlocks: ElectionBlock[],
+    stored: PartySlateOpenMap,
+): PartySlateOpenMap {
+    const next: PartySlateOpenMap = {};
+    for (const election of electionBlocks) {
+        for (const party of election.parties) {
+            next[party.id] = stored[party.id] ?? true;
+        }
+    }
+    return next;
+}
 
 function statusBadgeClass(status: string): string {
     switch (status) {
@@ -118,6 +178,34 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
         nominee: CandidateOnParty;
     } | null>(null);
 
+    const partyListSignature = useMemo(
+        () => partyIdsSignature(elections),
+        [elections],
+    );
+
+    const [partySlateOpenById, setPartySlateOpenById] =
+        useState<PartySlateOpenMap>({});
+
+    useLayoutEffect(() => {
+        const stored = readPartySlateOpenMapFromStorage();
+        setPartySlateOpenById(mergePartySlateOpenMap(elections, stored));
+    }, [elections, partyListSignature]);
+
+    function togglePartySlate(partyId: number): void {
+        setPartySlateOpenById((prev) => {
+            const isOpen = prev[partyId] !== false;
+            const next = { ...prev, [partyId]: !isOpen };
+            writePartySlateOpenMapToStorage(next);
+            console.log(
+                '[AdminPartiesIndex] toggle party slate',
+                partyId,
+                'expanded',
+                !isOpen,
+            );
+            return next;
+        });
+    }
+
     useEffect(() => {
         const msg = page.props.flash?.success;
         if (msg) {
@@ -165,11 +253,11 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                         <h1 className="text-lg font-semibold tracking-tight">
                             Parties & slates
                         </h1>
-                        <p className="text-muted-foreground text-sm">
-                            Create a party for an election as campus-wide or for a single
-                            program (e.g. BSIT). Add each nominee with a typed role
-                            title, platform, and{' '}
-                            <span className="text-foreground font-medium">
+                        <p className="text-sm text-muted-foreground">
+                            Create a party for an election as campus-wide or for
+                            a single program (e.g. BSIT). Add each nominee with
+                            a typed role title, platform, and{' '}
+                            <span className="font-medium text-foreground">
                                 program
                             </span>
                             .
@@ -198,9 +286,10 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                     No elections yet
                                 </CardTitle>
                                 <CardDescription>
-                                    Add an election under Election schedule first, then
-                                    set up parties here. Nominee roles create matching
-                                    ballot lines automatically.
+                                    Add an election under Election schedule
+                                    first, then set up parties here. Nominee
+                                    roles create matching ballot lines
+                                    automatically.
                                 </CardDescription>
                             </div>
                         </CardHeader>
@@ -225,10 +314,11 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                             </Badge>
                                         </CardTitle>
                                         <CardDescription>
-                                            Party names are unique within this election.
-                                            Type any role when adding a nominee (e.g.
-                                            President, Chief delegate). Program slates
-                                            keep those lines tied to that program.
+                                            Party names are unique within this
+                                            election. Type any role when adding
+                                            a nominee (e.g. President, Chief
+                                            delegate). Program slates keep those
+                                            lines tied to that program.
                                         </CardDescription>
                                     </div>
                                     <Button
@@ -248,241 +338,306 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-4">
                                     {election.parties.length === 0 ? (
-                                        <p className="text-muted-foreground text-sm">
+                                        <p className="text-sm text-muted-foreground">
                                             No parties for this election yet.
                                         </p>
                                     ) : (
-                                        election.parties.map((party) => (
-                                            <div
-                                                key={party.id}
-                                                className="bg-muted/15 rounded-lg border"
-                                            >
-                                                <div className="flex flex-wrap items-start justify-between gap-2 border-b px-4 py-3">
-                                                    <div className="min-w-0">
-                                                        <p className="font-medium">
-                                                            {party.name}
-                                                            {party.short_name ? (
-                                                                <span className="text-muted-foreground font-normal">
-                                                                    {' '}
-                                                                    (
-                                                                    {
-                                                                        party.short_name
-                                                                    }
-                                                                    )
-                                                                </span>
-                                                            ) : null}
-                                                        </p>
-                                                        <div className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-xs">
-                                                            <Badge
-                                                                variant="secondary"
-                                                                className="font-normal"
+                                        election.parties.map((party) => {
+                                            const slateExpanded =
+                                                partySlateOpenById[party.id] !==
+                                                false;
+                                            const slateBodyId = `party-slate-body-${party.id}`;
+
+                                            return (
+                                                <div
+                                                    key={party.id}
+                                                    className="rounded-lg border bg-muted/15"
+                                                >
+                                                    <div className="flex flex-wrap items-start justify-between gap-2 border-b px-4 py-3">
+                                                        <button
+                                                            type="button"
+                                                            id={`party-slate-trigger-${party.id}`}
+                                                            className={cn(
+                                                                'flex min-w-0 flex-1 cursor-pointer gap-3 rounded-md text-left outline-none',
+                                                                'focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                                                            )}
+                                                            aria-expanded={
+                                                                slateExpanded
+                                                            }
+                                                            aria-controls={
+                                                                slateBodyId
+                                                            }
+                                                            onClick={() =>
+                                                                togglePartySlate(
+                                                                    party.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            <ChevronDown
+                                                                className={cn(
+                                                                    'mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform',
+                                                                    !slateExpanded &&
+                                                                        '-rotate-90',
+                                                                )}
+                                                                aria-hidden
+                                                            />
+                                                            <div className="min-w-0">
+                                                                <p className="font-medium">
+                                                                    {party.name}
+                                                                    {party.short_name ? (
+                                                                        <span className="font-normal text-muted-foreground">
+                                                                            {' '}
+                                                                            (
+                                                                            {
+                                                                                party.short_name
+                                                                            }
+                                                                            )
+                                                                        </span>
+                                                                    ) : null}
+                                                                </p>
+                                                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="font-normal"
+                                                                    >
+                                                                        {
+                                                                            party.scope_label
+                                                                        }
+                                                                    </Badge>
+                                                                    <span>
+                                                                        Sort{' '}
+                                                                        {
+                                                                            party.sort_order
+                                                                        }
+                                                                        ·{' '}
+                                                                        {
+                                                                            party
+                                                                                .candidates
+                                                                                .length
+                                                                        }{' '}
+                                                                        nominee
+                                                                        {party
+                                                                            .candidates
+                                                                            .length ===
+                                                                        1
+                                                                            ? ''
+                                                                            : 's'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                        <div className="flex shrink-0 flex-wrap gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    setSlateNomineeDialog(
+                                                                        {
+                                                                            mode: 'create',
+                                                                            election,
+                                                                            party,
+                                                                        },
+                                                                    );
+                                                                    console.log(
+                                                                        '[AdminPartiesIndex] open add nominee',
+                                                                        party.id,
+                                                                    );
+                                                                }}
                                                             >
-                                                                {party.scope_label}
-                                                            </Badge>
-                                                            <span>
-                                                                Sort{' '}
-                                                                {party.sort_order}
-                                                                ·{' '}
-                                                                {
-                                                                    party.candidates
-                                                                        .length
-                                                                }{' '}
-                                                                nominee
-                                                                {party.candidates
-                                                                    .length ===
-                                                                1
-                                                                    ? ''
-                                                                    : 's'}
-                                                            </span>
+                                                                <Plus className="mr-1 size-4" />
+                                                                Add nominee
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    setPartyDialog(
+                                                                        {
+                                                                            mode: 'edit',
+                                                                            election,
+                                                                            party,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Pencil className="size-4" />
+                                                                <span className="sr-only">
+                                                                    Edit party
+                                                                </span>
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive-foreground"
+                                                                onClick={() =>
+                                                                    setDeleteParty(
+                                                                        {
+                                                                            election,
+                                                                            party,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="size-4" />
+                                                                <span className="sr-only">
+                                                                    Delete party
+                                                                </span>
+                                                            </Button>
                                                         </div>
                                                     </div>
-                                                    <div className="flex shrink-0 flex-wrap gap-2">
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setSlateNomineeDialog({
-                                                                    mode: 'create',
-                                                                    election,
-                                                                    party,
-                                                                });
-                                                                console.log(
-                                                                    '[AdminPartiesIndex] open add nominee',
-                                                                    party.id,
-                                                                );
-                                                            }}
+                                                    {slateExpanded ? (
+                                                        <div
+                                                            id={slateBodyId}
+                                                            role="region"
+                                                            aria-labelledby={`party-slate-trigger-${party.id}`}
+                                                            className="overflow-x-auto px-2 pt-2 pb-3 sm:px-4"
                                                         >
-                                                            <Plus className="mr-1 size-4" />
-                                                            Add nominee
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                setPartyDialog({
-                                                                    mode: 'edit',
-                                                                    election,
-                                                                    party,
-                                                                })
-                                                            }
-                                                        >
-                                                            <Pencil className="size-4" />
-                                                            <span className="sr-only">
-                                                                Edit party
-                                                            </span>
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="text-destructive hover:bg-destructive/10"
-                                                            onClick={() =>
-                                                                setDeleteParty({
-                                                                    election,
-                                                                    party,
-                                                                })
-                                                            }
-                                                        >
-                                                            <Trash2 className="size-4" />
-                                                            <span className="sr-only">
-                                                                Delete party
-                                                            </span>
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="overflow-x-auto px-2 pb-3 pt-2 sm:px-4">
-                                                    {party.candidates.length ===
-                                                    0 ? (
-                                                        <p className="text-muted-foreground px-2 py-2 text-sm">
-                                                            No nominees yet. Use Add
-                                                            nominee to attach each
-                                                            person to this slate.
-                                                        </p>
-                                                    ) : (
-                                                        <table className="w-full min-w-[760px] text-sm">
-                                                            <thead>
-                                                                <tr className="border-b text-left">
-                                                                    <th className="px-2 py-2 font-medium">
-                                                                        Candidate
-                                                                    </th>
-                                                                    <th className="px-2 py-2 font-medium">
-                                                                        Running for
-                                                                    </th>
-                                                                    <th className="px-2 py-2 font-medium">
-                                                                        Dept / race
-                                                                        scope
-                                                                    </th>
-                                                                    <th className="px-2 py-2 font-medium">
-                                                                        Nominee program
-                                                                    </th>
-                                                                    <th className="px-2 py-2 font-medium">
-                                                                        Platform
-                                                                    </th>
-                                                                    <th className="px-2 py-2 text-right font-medium">
-                                                                        Actions
-                                                                    </th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {party.candidates.map(
-                                                                    (row) => (
-                                                                        <tr
-                                                                            key={
-                                                                                row.id
-                                                                            }
-                                                                            className="border-b border-border/80 last:border-0"
-                                                                        >
-                                                                            <td className="px-2 py-2 font-medium">
-                                                                                {
-                                                                                    row.full_name
-                                                                                }
-                                                                            </td>
-                                                                            <td className="text-muted-foreground px-2 py-2">
-                                                                                {
-                                                                                    row.position_name
-                                                                                }
-                                                                            </td>
-                                                                            <td className="text-muted-foreground px-2 py-2 text-xs">
-                                                                                {
-                                                                                    row.department
-                                                                                }
-                                                                            </td>
-                                                                            <td className="text-muted-foreground px-2 py-2 text-xs">
-                                                                                {row.candidate_course_id !==
-                                                                                null
-                                                                                    ? courses.find(
-                                                                                          (
-                                                                                              c,
-                                                                                          ) =>
-                                                                                              c.id ===
-                                                                                              row.candidate_course_id,
-                                                                                      )
-                                                                                          ?.code ??
-                                                                                      '—'
-                                                                                    : '—'}
-                                                                            </td>
-                                                                            <td className="text-muted-foreground max-w-[14rem] px-2 py-2 text-xs">
-                                                                                {row.platform ??
-                                                                                    '—'}
-                                                                            </td>
-                                                                            <td className="px-2 py-2 text-right">
-                                                                                <div className="flex justify-end gap-2">
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="outline"
-                                                                                        size="sm"
-                                                                                        onClick={() =>
-                                                                                            setSlateNomineeDialog(
-                                                                                                {
-                                                                                                    mode:
-                                                                                                        'edit',
-                                                                                                    election,
-                                                                                                    party,
-                                                                                                    nominee:
-                                                                                                        row,
-                                                                                                },
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <Pencil className="size-4" />
-                                                                                        <span className="sr-only">
-                                                                                            Edit nominee
-                                                                                        </span>
-                                                                                    </Button>
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="outline"
-                                                                                        size="sm"
-                                                                                        className="text-destructive hover:bg-destructive/10"
-                                                                                        onClick={() =>
-                                                                                            setDeleteNominee(
-                                                                                                {
-                                                                                                    election,
-                                                                                                    party,
-                                                                                                    nominee:
-                                                                                                        row,
-                                                                                                },
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <Trash2 className="size-4" />
-                                                                                        <span className="sr-only">
-                                                                                            Remove nominee
-                                                                                        </span>
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </td>
+                                                            {party.candidates
+                                                                .length ===
+                                                            0 ? (
+                                                                <p className="px-2 py-2 text-sm text-muted-foreground">
+                                                                    No nominees
+                                                                    yet. Use Add
+                                                                    nominee to
+                                                                    attach each
+                                                                    person to
+                                                                    this slate.
+                                                                </p>
+                                                            ) : (
+                                                                <table className="w-full min-w-[760px] text-sm">
+                                                                    <thead>
+                                                                        <tr className="border-b text-left">
+                                                                            <th className="px-2 py-2 font-medium">
+                                                                                Candidate
+                                                                            </th>
+                                                                            <th className="px-2 py-2 font-medium">
+                                                                                Running
+                                                                                for
+                                                                            </th>
+                                                                            <th className="px-2 py-2 font-medium">
+                                                                                Dept
+                                                                                /
+                                                                                race
+                                                                                scope
+                                                                            </th>
+                                                                            <th className="px-2 py-2 font-medium">
+                                                                                Nominee
+                                                                                program
+                                                                            </th>
+                                                                            <th className="px-2 py-2 font-medium">
+                                                                                Platform
+                                                                            </th>
+                                                                            <th className="px-2 py-2 text-right font-medium">
+                                                                                Actions
+                                                                            </th>
                                                                         </tr>
-                                                                    ),
-                                                                )}
-                                                            </tbody>
-                                                        </table>
-                                                    )}
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {party.candidates.map(
+                                                                            (
+                                                                                row,
+                                                                            ) => (
+                                                                                <tr
+                                                                                    key={
+                                                                                        row.id
+                                                                                    }
+                                                                                    className="border-b border-border/80 last:border-0"
+                                                                                >
+                                                                                    <td className="px-2 py-2 font-medium">
+                                                                                        {
+                                                                                            row.full_name
+                                                                                        }
+                                                                                    </td>
+                                                                                    <td className="px-2 py-2 text-muted-foreground">
+                                                                                        {
+                                                                                            row.position_name
+                                                                                        }
+                                                                                    </td>
+                                                                                    <td className="px-2 py-2 text-xs text-muted-foreground">
+                                                                                        {
+                                                                                            row.department
+                                                                                        }
+                                                                                    </td>
+                                                                                    <td className="px-2 py-2 text-xs text-muted-foreground">
+                                                                                        {row.candidate_course_id !==
+                                                                                        null
+                                                                                            ? (courses.find(
+                                                                                                  (
+                                                                                                      c,
+                                                                                                  ) =>
+                                                                                                      c.id ===
+                                                                                                      row.candidate_course_id,
+                                                                                              )
+                                                                                                  ?.code ??
+                                                                                              '—')
+                                                                                            : '—'}
+                                                                                    </td>
+                                                                                    <td className="max-w-[14rem] px-2 py-2 text-xs text-muted-foreground">
+                                                                                        {row.platform ??
+                                                                                            '—'}
+                                                                                    </td>
+                                                                                    <td className="px-2 py-2 text-right">
+                                                                                        <div className="flex justify-end gap-2">
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="outline"
+                                                                                                size="sm"
+                                                                                                onClick={() =>
+                                                                                                    setSlateNomineeDialog(
+                                                                                                        {
+                                                                                                            mode: 'edit',
+                                                                                                            election,
+                                                                                                            party,
+                                                                                                            nominee:
+                                                                                                                row,
+                                                                                                        },
+                                                                                                    )
+                                                                                                }
+                                                                                            >
+                                                                                                <Pencil className="size-4" />
+                                                                                                <span className="sr-only">
+                                                                                                    Edit
+                                                                                                    nominee
+                                                                                                </span>
+                                                                                            </Button>
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="outline"
+                                                                                                size="sm"
+                                                                                                className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive-foreground"
+                                                                                                onClick={() =>
+                                                                                                    setDeleteNominee(
+                                                                                                        {
+                                                                                                            election,
+                                                                                                            party,
+                                                                                                            nominee:
+                                                                                                                row,
+                                                                                                        },
+                                                                                                    )
+                                                                                                }
+                                                                                            >
+                                                                                                <Trash2 className="size-4" />
+                                                                                                <span className="sr-only">
+                                                                                                    Remove
+                                                                                                    nominee
+                                                                                                </span>
+                                                                                            </Button>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ),
+                                                                        )}
+                                                                    </tbody>
+                                                                </table>
+                                                            )}
+                                                        </div>
+                                                    ) : null}
                                                 </div>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </CardContent>
                             </Card>
@@ -506,7 +661,7 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                 </DialogTitle>
                                 <DialogDescription>
                                     Election:{' '}
-                                    <span className="text-foreground font-medium">
+                                    <span className="font-medium text-foreground">
                                         {partyDialog.election.title}
                                     </span>
                                 </DialogDescription>
@@ -524,7 +679,9 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                           })
                                 }
                                 method={
-                                    partyDialog.mode === 'create' ? 'post' : 'patch'
+                                    partyDialog.mode === 'create'
+                                        ? 'post'
+                                        : 'patch'
                                 }
                                 options={{ preserveScroll: true }}
                                 onSuccess={() => {
@@ -566,12 +723,14 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                                 defaultValue={
                                                     partyDialog.mode === 'edit'
                                                         ? partyDialog.party
-                                                              .course_id === null
-                                                          ? ''
-                                                          : String(
-                                                                partyDialog.party
-                                                                    .course_id,
-                                                            )
+                                                              .course_id ===
+                                                          null
+                                                            ? ''
+                                                            : String(
+                                                                  partyDialog
+                                                                      .party
+                                                                      .course_id,
+                                                              )
                                                         : ''
                                                 }
                                             >
@@ -587,17 +746,20 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                                     </option>
                                                 ))}
                                             </select>
-                                            <p className="text-muted-foreground text-xs leading-snug">
-                                                Program slates only open ballot lines
-                                                for that program; role titles reuse a
-                                                line when the wording matches exactly.
+                                            <p className="text-xs leading-snug text-muted-foreground">
+                                                Program slates only open ballot
+                                                lines for that program; role
+                                                titles reuse a line when the
+                                                wording matches exactly.
                                             </p>
-                                            <InputError message={errors.course_id} />
+                                            <InputError
+                                                message={errors.course_id}
+                                            />
                                         </div>
                                         <div className="grid gap-2">
                                             <Label htmlFor="party_short">
                                                 Short label{' '}
-                                                <span className="text-muted-foreground font-normal">
+                                                <span className="font-normal text-muted-foreground">
                                                     (optional)
                                                 </span>
                                             </Label>
@@ -620,7 +782,7 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                         <div className="grid gap-2">
                                             <Label htmlFor="party_sort">
                                                 Sort order{' '}
-                                                <span className="text-muted-foreground font-normal">
+                                                <span className="font-normal text-muted-foreground">
                                                     (optional)
                                                 </span>
                                             </Label>
@@ -657,7 +819,8 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                             >
                                                 {processing
                                                     ? 'Saving…'
-                                                    : partyDialog.mode === 'create'
+                                                    : partyDialog.mode ===
+                                                        'create'
                                                       ? 'Add party'
                                                       : 'Save'}
                                             </Button>
@@ -685,203 +848,215 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                                 </DialogTitle>
                                 <DialogDescription>
                                     Party{' '}
-                                    <span className="text-foreground font-medium">
+                                    <span className="font-medium text-foreground">
                                         {slateNomineeDialog.party.name}
                                     </span>{' '}
-                                    ({slateNomineeDialog.party.scope_label}) · Election{' '}
-                                    <span className="text-foreground font-medium">
+                                    ({slateNomineeDialog.party.scope_label}) ·
+                                    Election{' '}
+                                    <span className="font-medium text-foreground">
                                         {slateNomineeDialog.election.title}
                                     </span>
                                 </DialogDescription>
                             </DialogHeader>
-                            <p className="text-muted-foreground px-px pb-2 text-xs leading-snug">
-                                The role creates or reuses a ballot line with the same
-                                title for this election and slate scope (
-                                {slateNomineeDialog.party.scope_label}).
+                            <p className="px-px pb-2 text-xs leading-snug text-muted-foreground">
+                                The role creates or reuses a ballot line with
+                                the same title for this election and slate scope
+                                ({slateNomineeDialog.party.scope_label}).
                             </p>
                             <Form
-                                    key={nomineeFormKey}
-                                    action={
-                                        slateNomineeDialog.mode === 'create'
-                                            ? PartyController.storeSlateCandidate.url({
+                                key={nomineeFormKey}
+                                action={
+                                    slateNomineeDialog.mode === 'create'
+                                        ? PartyController.storeSlateCandidate.url(
+                                              {
                                                   election:
-                                                      slateNomineeDialog.election.id,
-                                                  party: slateNomineeDialog.party.id,
-                                              })
-                                            : PartyController.updateSlateCandidate.url({
+                                                      slateNomineeDialog
+                                                          .election.id,
+                                                  party: slateNomineeDialog
+                                                      .party.id,
+                                              },
+                                          )
+                                        : PartyController.updateSlateCandidate.url(
+                                              {
                                                   election:
-                                                      slateNomineeDialog.election.id,
-                                                  party: slateNomineeDialog.party.id,
+                                                      slateNomineeDialog
+                                                          .election.id,
+                                                  party: slateNomineeDialog
+                                                      .party.id,
                                                   candidate:
-                                                      slateNomineeDialog.nominee.id,
-                                              })
-                                    }
-                                    method={
-                                        slateNomineeDialog.mode === 'create'
-                                            ? 'post'
-                                            : 'patch'
-                                    }
-                                    options={{ preserveScroll: true }}
-                                    onSuccess={() => {
-                                        console.log(
-                                            '[AdminPartiesIndex] nominee saved',
-                                        );
-                                        setSlateNomineeDialog(null);
-                                    }}
-                                    className="grid gap-4"
-                                >
-                                    {({ processing, errors }) => (
-                                        <>
+                                                      slateNomineeDialog.nominee
+                                                          .id,
+                                              },
+                                          )
+                                }
+                                method={
+                                    slateNomineeDialog.mode === 'create'
+                                        ? 'post'
+                                        : 'patch'
+                                }
+                                options={{ preserveScroll: true }}
+                                onSuccess={() => {
+                                    console.log(
+                                        '[AdminPartiesIndex] nominee saved',
+                                    );
+                                    setSlateNomineeDialog(null);
+                                }}
+                                className="grid gap-4"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="nominee_role">
+                                                Position / role (title)
+                                            </Label>
+                                            <Input
+                                                id="nominee_role"
+                                                name="position_name"
+                                                required
+                                                placeholder="e.g. President, Chief delegate"
+                                                autoComplete="organization-title"
+                                                defaultValue={
+                                                    slateNomineeDialog.mode ===
+                                                    'edit'
+                                                        ? slateNomineeDialog
+                                                              .nominee
+                                                              .position_name
+                                                        : ''
+                                                }
+                                            />
+                                            <InputError
+                                                message={errors.position_name}
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="nominee_full_name">
+                                                Full name
+                                            </Label>
+                                            <Input
+                                                id="nominee_full_name"
+                                                name="full_name"
+                                                required
+                                                autoComplete="name"
+                                                defaultValue={
+                                                    slateNomineeDialog.mode ===
+                                                    'edit'
+                                                        ? slateNomineeDialog
+                                                              .nominee.full_name
+                                                        : ''
+                                                }
+                                            />
+                                            <InputError
+                                                message={errors.full_name}
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="nominee_platform">
+                                                Platform{' '}
+                                                <span className="font-normal text-muted-foreground">
+                                                    (optional)
+                                                </span>
+                                            </Label>
+                                            <textarea
+                                                id="nominee_platform"
+                                                name="platform"
+                                                rows={4}
+                                                className={cn(
+                                                    'flex min-h-[88px] w-full resize-y rounded-md border border-input px-3 py-2 text-sm shadow-xs outline-none',
+                                                    'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                                                )}
+                                                defaultValue={
+                                                    slateNomineeDialog.mode ===
+                                                    'edit'
+                                                        ? (slateNomineeDialog
+                                                              .nominee
+                                                              .platform ?? '')
+                                                        : ''
+                                                }
+                                            />
+                                            <InputError
+                                                message={errors.platform}
+                                            />
+                                        </div>
+                                        {slateNomineeDialog.party.course_id ===
+                                        null ? (
                                             <div className="grid gap-2">
-                                                <Label htmlFor="nominee_role">
-                                                    Position / role (title)
-                                                </Label>
-                                                <Input
-                                                    id="nominee_role"
-                                                    name="position_name"
-                                                    required
-                                                    placeholder="e.g. President, Chief delegate"
-                                                    autoComplete="organization-title"
-                                                    defaultValue={
-                                                        slateNomineeDialog.mode ===
-                                                        'edit'
-                                                            ? slateNomineeDialog.nominee
-                                                                  .position_name
-                                                            : ''
-                                                    }
-                                                />
-                                                <InputError
-                                                    message={errors.position_name}
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="nominee_full_name">
-                                                    Full name
-                                                </Label>
-                                                <Input
-                                                    id="nominee_full_name"
-                                                    name="full_name"
-                                                    required
-                                                    autoComplete="name"
-                                                    defaultValue={
-                                                        slateNomineeDialog.mode ===
-                                                        'edit'
-                                                            ? slateNomineeDialog.nominee
-                                                                  .full_name
-                                                            : ''
-                                                    }
-                                                />
-                                                <InputError
-                                                    message={errors.full_name}
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="nominee_platform">
-                                                    Platform{' '}
-                                                    <span className="text-muted-foreground font-normal">
+                                                <Label htmlFor="nominee_course">
+                                                    Nominee&apos;s program{' '}
+                                                    <span className="font-normal text-muted-foreground">
                                                         (optional)
                                                     </span>
                                                 </Label>
-                                                <textarea
-                                                    id="nominee_platform"
-                                                    name="platform"
-                                                    rows={4}
-                                                    className={cn(
-                                                        'border-input flex min-h-[88px] w-full resize-y rounded-md border px-3 py-2 text-sm shadow-xs outline-none',
-                                                        'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                                                    )}
+                                                <select
+                                                    id="nominee_course"
+                                                    name="course_id"
+                                                    className={selectClasses}
                                                     defaultValue={
                                                         slateNomineeDialog.mode ===
-                                                        'edit'
-                                                            ? (slateNomineeDialog.nominee
-                                                                  .platform ?? '')
+                                                            'edit' &&
+                                                        slateNomineeDialog
+                                                            .nominee
+                                                            .candidate_course_id !==
+                                                            null
+                                                            ? String(
+                                                                  slateNomineeDialog
+                                                                      .nominee
+                                                                      .candidate_course_id,
+                                                              )
                                                             : ''
                                                     }
-                                                />
+                                                >
+                                                    <option value="">—</option>
+                                                    {courses.map((c) => (
+                                                        <option
+                                                            key={c.id}
+                                                            value={String(c.id)}
+                                                        >
+                                                            {c.code}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                                 <InputError
-                                                    message={errors.platform}
+                                                    message={errors.course_id}
                                                 />
                                             </div>
-                                            {slateNomineeDialog.party.course_id ===
-                                            null ? (
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="nominee_course">
-                                                        Nominee&apos;s program{' '}
-                                                        <span className="text-muted-foreground font-normal">
-                                                            (optional)
-                                                        </span>
-                                                    </Label>
-                                                    <select
-                                                        id="nominee_course"
-                                                        name="course_id"
-                                                        className={selectClasses}
-                                                        defaultValue={
-                                                            slateNomineeDialog.mode ===
-                                                                'edit' &&
-                                                            slateNomineeDialog.nominee
-                                                                .candidate_course_id !==
-                                                                null
-                                                                ? String(
-                                                                      slateNomineeDialog
-                                                                          .nominee
-                                                                          .candidate_course_id,
-                                                                  )
-                                                                : ''
-                                                        }
-                                                    >
-                                                        <option value="">—</option>
-                                                        {courses.map((c) => (
-                                                            <option
-                                                                key={c.id}
-                                                                value={String(
-                                                                    c.id,
-                                                                )}
-                                                            >
-                                                                {c.code}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <InputError
-                                                        message={errors.course_id}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <p className="text-muted-foreground text-xs leading-snug">
-                                                    Nominee&apos;s program is set to{' '}
-                                                    <span className="text-foreground font-medium">
-                                                        {
-                                                            slateNomineeDialog.party
-                                                                .course?.code
-                                                        }
-                                                    </span>{' '}
-                                                    automatically for program slates.
-                                                </p>
-                                            )}
-                                            <DialogFooter className="gap-2 sm:gap-0">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setSlateNomineeDialog(null)
+                                        ) : (
+                                            <p className="text-xs leading-snug text-muted-foreground">
+                                                Nominee&apos;s program is set to{' '}
+                                                <span className="font-medium text-foreground">
+                                                    {
+                                                        slateNomineeDialog.party
+                                                            .course?.code
                                                     }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={processing}
-                                                >
-                                                    {processing
-                                                        ? 'Saving…'
-                                                        : slateNomineeDialog.mode ===
-                                                            'create'
-                                                          ? 'Add nominee'
-                                                          : 'Save nominee'}
-                                                </Button>
-                                            </DialogFooter>
-                                        </>
-                                    )}
-                                </Form>
+                                                </span>{' '}
+                                                automatically for program
+                                                slates.
+                                            </p>
+                                        )}
+                                        <DialogFooter className="gap-2 sm:gap-0">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setSlateNomineeDialog(null)
+                                                }
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                disabled={processing}
+                                            >
+                                                {processing
+                                                    ? 'Saving…'
+                                                    : slateNomineeDialog.mode ===
+                                                        'create'
+                                                      ? 'Add nominee'
+                                                      : 'Save nominee'}
+                                            </Button>
+                                        </DialogFooter>
+                                    </>
+                                )}
+                            </Form>
                         </>
                     ) : null}
                 </DialogContent>
@@ -895,8 +1070,8 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                     <DialogHeader>
                         <DialogTitle>Remove party?</DialogTitle>
                         <DialogDescription>
-                            Slate nominees lose this party association (votes already
-                            cast stay recorded).
+                            Slate nominees lose this party association (votes
+                            already cast stay recorded).
                         </DialogDescription>
                     </DialogHeader>
                     {deleteParty !== null ? (
@@ -947,8 +1122,9 @@ export default function AdminPartiesIndex({ courses, elections }: Props) {
                     <DialogHeader>
                         <DialogTitle>Remove nominee?</DialogTitle>
                         <DialogDescription>
-                            Removes this person from this party slate and removes their
-                            ballot row if nobody has voted for them yet.
+                            Removes this person from this party slate and
+                            removes their ballot row if nobody has voted for
+                            them yet.
                         </DialogDescription>
                     </DialogHeader>
                     {deleteNominee !== null ? (

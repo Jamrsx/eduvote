@@ -78,8 +78,9 @@ export default function AdminCoursesIndex({ courses }: Props) {
                             Programs
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Define programs once; reuse them for student profiles,
-                            department races, and candidate affiliation.
+                            Define programs once; reuse them for student
+                            profiles, department races, and candidate
+                            affiliation.
                         </p>
                     </div>
                     <Button type="button" onClick={openCreate}>
@@ -109,24 +110,24 @@ export default function AdminCoursesIndex({ courses }: Props) {
                     <CardContent className="px-0 sm:px-6">
                         {courses.length === 0 ? (
                             <p className="px-6 text-sm text-muted-foreground sm:px-0">
-                                No programs yet. Click &quot;Add program&quot; to
-                                create the first one.
+                                No programs yet. Click &quot;Add program&quot;
+                                to create the first one.
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[520px] text-sm">
                                     <thead>
                                         <tr className="border-b text-left">
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Code
                                             </th>
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Name
                                             </th>
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Sort
                                             </th>
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Students
                                             </th>
                                             <th className="pb-3 text-right font-medium">
@@ -150,7 +151,9 @@ export default function AdminCoursesIndex({ courses }: Props) {
                                                     {course.sort_order}
                                                 </td>
                                                 <td className="py-3 pr-4 tabular-nums">
-                                                    {course.student_profiles_count}
+                                                    {
+                                                        course.student_profiles_count
+                                                    }
                                                 </td>
                                                 <td className="py-3">
                                                     <div className="flex justify-end gap-2">
@@ -171,7 +174,7 @@ export default function AdminCoursesIndex({ courses }: Props) {
                                                             type="button"
                                                             variant="outline"
                                                             size="sm"
-                                                            className="text-destructive hover:bg-destructive/10"
+                                                            className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive-foreground"
                                                             disabled={
                                                                 course.student_profiles_count >
                                                                 0
@@ -269,9 +272,7 @@ export default function AdminCoursesIndex({ courses }: Props) {
                                         type="number"
                                         min={0}
                                         max={65535}
-                                        defaultValue={
-                                            editing?.sort_order ?? 0
-                                        }
+                                        defaultValue={editing?.sort_order ?? 0}
                                         aria-invalid={Boolean(
                                             errors.sort_order,
                                         )}

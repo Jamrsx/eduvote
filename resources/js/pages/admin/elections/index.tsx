@@ -77,13 +77,13 @@ function statusBadgeClass(status: string): string {
 }
 
 const selectClasses = cn(
-    'border-input file:text-foreground placeholder:text-muted-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm',
-    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+    'flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:text-foreground placeholder:text-muted-foreground md:text-sm',
+    'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
 );
 
 const textareaClasses = cn(
-    'border-input placeholder:text-muted-foreground flex min-h-[72px] w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm',
-    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+    'flex min-h-[72px] w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground md:text-sm',
+    'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
 );
 
 export default function AdminElectionsIndex({
@@ -147,10 +147,10 @@ export default function AdminElectionsIndex({
                         <h1 className="text-lg font-semibold tracking-tight">
                             Election schedule
                         </h1>
-                        <p className="text-muted-foreground text-sm">
-                            Create voting periods with open and close times. Add parties
-                            and nominees under{' '}
-                            <span className="text-foreground font-medium">
+                        <p className="text-sm text-muted-foreground">
+                            Create voting periods with open and close times. Add
+                            parties and nominees under{' '}
+                            <span className="font-medium text-foreground">
                                 Parties
                             </span>{' '}
                             in the Elections group.
@@ -189,34 +189,34 @@ export default function AdminElectionsIndex({
                             <CardTitle>Election periods</CardTitle>
                         </div>
                         <CardDescription>
-                            Status is managed here; scheduled jobs can align it with
-                            dates in a later release.
+                            Status is managed here; scheduled jobs can align it
+                            with dates in a later release.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="px-0 sm:px-6">
                         {elections.length === 0 ? (
                             <p className="px-6 text-sm text-muted-foreground sm:px-0">
-                                No elections yet. Click &quot;New election&quot; to create
-                                the first one.
+                                No elections yet. Click &quot;New election&quot;
+                                to create the first one.
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[720px] text-sm">
                                     <thead>
                                         <tr className="border-b text-left">
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Title
                                             </th>
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Status
                                             </th>
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Opens
                                             </th>
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Closes
                                             </th>
-                                            <th className="pb-3 pr-4 font-medium">
+                                            <th className="pr-4 pb-3 font-medium">
                                                 Votes
                                             </th>
                                             <th className="pb-3 text-right font-medium">
@@ -231,11 +231,11 @@ export default function AdminElectionsIndex({
                                                 className="border-b border-border/80 last:border-0"
                                             >
                                                 <td className="max-w-[14rem] py-3 pr-4">
-                                                    <div className="font-medium leading-snug">
+                                                    <div className="leading-snug font-medium">
                                                         {row.title}
                                                     </div>
                                                     {row.description ? (
-                                                        <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                                                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                                                             {row.description}
                                                         </p>
                                                     ) : null}
@@ -250,11 +250,13 @@ export default function AdminElectionsIndex({
                                                         {row.status}
                                                     </Badge>
                                                 </td>
-                                                <td className="text-muted-foreground py-3 pr-4 text-xs whitespace-nowrap">
-                                                    {row.opens_at_display ?? '—'}
+                                                <td className="py-3 pr-4 text-xs whitespace-nowrap text-muted-foreground">
+                                                    {row.opens_at_display ??
+                                                        '—'}
                                                 </td>
-                                                <td className="text-muted-foreground py-3 pr-4 text-xs whitespace-nowrap">
-                                                    {row.closes_at_display ?? '—'}
+                                                <td className="py-3 pr-4 text-xs whitespace-nowrap text-muted-foreground">
+                                                    {row.closes_at_display ??
+                                                        '—'}
                                                 </td>
                                                 <td className="py-3 pr-4 tabular-nums">
                                                     {row.votes_count}
@@ -278,12 +280,14 @@ export default function AdminElectionsIndex({
                                                             type="button"
                                                             variant="outline"
                                                             size="sm"
-                                                            className="text-destructive hover:bg-destructive/10"
+                                                            className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive-foreground"
                                                             disabled={
-                                                                row.votes_count > 0
+                                                                row.votes_count >
+                                                                0
                                                             }
                                                             title={
-                                                                row.votes_count > 0
+                                                                row.votes_count >
+                                                                0
                                                                     ? 'Remove recorded votes before deleting'
                                                                     : undefined
                                                             }
@@ -315,9 +319,9 @@ export default function AdminElectionsIndex({
                             {editing ? 'Edit election' : 'New election'}
                         </DialogTitle>
                         <DialogDescription>
-                            Open and close times are stored using the application
-                            timezone (
-                            <span className="text-foreground font-mono text-xs">
+                            Open and close times are stored using the
+                            application timezone (
+                            <span className="font-mono text-xs text-foreground">
                                 {appTimezone}
                             </span>
                             ).
@@ -362,7 +366,7 @@ export default function AdminElectionsIndex({
                                 <div className="grid gap-2">
                                     <Label htmlFor="description">
                                         Description{' '}
-                                        <span className="text-muted-foreground font-normal">
+                                        <span className="font-normal text-muted-foreground">
                                             (optional)
                                         </span>
                                     </Label>
@@ -418,7 +422,9 @@ export default function AdminElectionsIndex({
                                                 errors.closes_at,
                                             )}
                                         />
-                                        <InputError message={errors.closes_at} />
+                                        <InputError
+                                            message={errors.closes_at}
+                                        />
                                     </div>
                                 </div>
 
@@ -473,8 +479,8 @@ export default function AdminElectionsIndex({
                         <DialogTitle>Delete election?</DialogTitle>
                         <DialogDescription>
                             This removes the election and any positions and
-                            candidates that belong to it. You cannot delete if votes
-                            have already been recorded.
+                            candidates that belong to it. You cannot delete if
+                            votes have already been recorded.
                         </DialogDescription>
                     </DialogHeader>
                     {deleting !== null ? (
@@ -500,7 +506,8 @@ export default function AdminElectionsIndex({
                                         type="submit"
                                         variant="destructive"
                                         disabled={
-                                            processing || deleting.votes_count > 0
+                                            processing ||
+                                            deleting.votes_count > 0
                                         }
                                     >
                                         Delete

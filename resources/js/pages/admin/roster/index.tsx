@@ -9,10 +9,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-    accentButtonOutline,
-    accentButtonSolid,
-} from '@/lib/admin-accent';
+import { accentButtonOutline, accentButtonSolid } from '@/lib/admin-accent';
 import { masterList as adminRosterMasterList } from '@/routes/admin/roster';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { CheckCircle2, Search, XCircle } from 'lucide-react';
@@ -99,16 +96,22 @@ export default function AdminSchoolRosterIndex({
                         <h1 className="text-xl font-semibold tracking-tight">
                             Pending registrations
                         </h1>
-                        <p className="text-muted-foreground text-sm leading-relaxed">
-                            Compare each request with the school roster (student ID or
-                            email). Approve when the student belongs to your school. Open{' '}
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                            Compare each request with the school roster (student
+                            ID or email). Approve when the student belongs to
+                            your school. Open{' '}
                             <span className="font-medium text-foreground">
                                 Masters List
                             </span>{' '}
-                            on a separate page to import or edit official roster rows.
+                            on a separate page to import or edit official roster
+                            rows.
                         </p>
                     </div>
-                    <Button variant="outline" className={accentButtonOutline} asChild>
+                    <Button
+                        variant="outline"
+                        className={accentButtonOutline}
+                        asChild
+                    >
                         <Link href={adminRosterMasterList().url} prefetch>
                             Masters List
                         </Link>
@@ -117,7 +120,7 @@ export default function AdminSchoolRosterIndex({
 
                 <div className="relative max-w-xl">
                     <Search
-                        className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
                         aria-hidden
                     />
                     <Input
@@ -133,7 +136,7 @@ export default function AdminSchoolRosterIndex({
 
                 <section
                     id="pending"
-                    className="scroll-mt-6 flex flex-col gap-4"
+                    className="flex scroll-mt-6 flex-col gap-4"
                     aria-labelledby="pending-registrations-heading"
                 >
                     <h2
@@ -142,7 +145,7 @@ export default function AdminSchoolRosterIndex({
                     >
                         Pending student registrations
                         {searchActive && pendingRegistrations.length > 0 ? (
-                            <span className="text-muted-foreground ml-2 text-base font-normal">
+                            <span className="ml-2 text-base font-normal text-muted-foreground">
                                 ({filteredPending.length} of{' '}
                                 {pendingRegistrations.length})
                             </span>
@@ -156,8 +159,8 @@ export default function AdminSchoolRosterIndex({
                                     No pending registrations
                                 </CardTitle>
                                 <CardDescription>
-                                    New student sign-ups will appear here until you approve
-                                    or decline them.
+                                    New student sign-ups will appear here until
+                                    you approve or decline them.
                                 </CardDescription>
                             </CardHeader>
                         </Card>
@@ -168,7 +171,8 @@ export default function AdminSchoolRosterIndex({
                                     No matching registrations
                                 </CardTitle>
                                 <CardDescription>
-                                    Try a different search term or clear the search field.
+                                    Try a different search term or clear the
+                                    search field.
                                 </CardDescription>
                             </CardHeader>
                         </Card>
@@ -185,8 +189,9 @@ export default function AdminSchoolRosterIndex({
                                                 <CardDescription className="font-mono text-xs">
                                                     {row.email}
                                                 </CardDescription>
-                                                <p className="text-muted-foreground text-xs">
-                                                    Requested {row.created_at ?? '—'}
+                                                <p className="text-xs text-muted-foreground">
+                                                    Requested{' '}
+                                                    {row.created_at ?? '—'}
                                                 </p>
                                             </div>
                                             <Badge
@@ -241,13 +246,17 @@ export default function AdminSchoolRosterIndex({
                                                         : '—'}
                                                 </dd>
                                             </div>
-                                            {(row.section || row.year_level) && (
+                                            {(row.section ||
+                                                row.year_level) && (
                                                 <div className="sm:col-span-2">
                                                     <dt className="text-muted-foreground">
                                                         Class
                                                     </dt>
                                                     <dd className="font-medium">
-                                                        {[row.section, row.year_level]
+                                                        {[
+                                                            row.section,
+                                                            row.year_level,
+                                                        ]
                                                             .filter(Boolean)
                                                             .join(' · ') || '—'}
                                                     </dd>
@@ -265,7 +274,9 @@ export default function AdminSchoolRosterIndex({
                                                 <Button
                                                     type="submit"
                                                     size="sm"
-                                                    className={accentButtonSolid}
+                                                    className={
+                                                        accentButtonSolid
+                                                    }
                                                 >
                                                     Approve
                                                 </Button>
@@ -281,7 +292,7 @@ export default function AdminSchoolRosterIndex({
                                                     type="submit"
                                                     variant="outline"
                                                     size="sm"
-                                                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                                                    className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive-foreground"
                                                 >
                                                     Decline
                                                 </Button>
