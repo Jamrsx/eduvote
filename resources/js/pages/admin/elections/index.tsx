@@ -22,8 +22,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
-import { index as adminCandidatesIndex } from '@/routes/admin/candidates';
-import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
+import { index as adminPartiesIndex } from '@/routes/admin/parties';
+import { CalendarDays, Flag, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -148,18 +148,19 @@ export default function AdminElectionsIndex({
                             Election schedule
                         </h1>
                         <p className="text-muted-foreground text-sm">
-                            Create voting periods with open and close times. Manage
-                            positions and nominees under{' '}
+                            Create voting periods with open and close times. Add parties
+                            and nominees under{' '}
                             <span className="text-foreground font-medium">
-                                Candidates
+                                Parties
                             </span>{' '}
                             in the Elections group.
                         </p>
                     </div>
                     <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
                         <Button variant="outline" asChild>
-                            <Link href={adminCandidatesIndex().url}>
-                                Candidates
+                            <Link href={adminPartiesIndex().url}>
+                                <Flag className="mr-2 size-4" aria-hidden />
+                                Parties
                             </Link>
                         </Button>
                         <Button type="button" onClick={openCreate}>

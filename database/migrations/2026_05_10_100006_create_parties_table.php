@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('parties', function (Blueprint $table) {
             $table->id();
             $table->foreignId('election_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('course_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->string('short_name')->nullable();
             $table->unsignedSmallInteger('sort_order')->default(0)->index();

@@ -18,6 +18,7 @@ class Party extends Model
      */
     protected $fillable = [
         'election_id',
+        'course_id',
         'name',
         'short_name',
         'sort_order',
@@ -40,6 +41,21 @@ class Party extends Model
     public function election(): BelongsTo
     {
         return $this->belongsTo(Election::class);
+    }
+
+    /**
+     * Single-program slate scope; null means campus-wide.
+     *
+     * @return BelongsTo<Course, $this>
+     */
+    public function course(): BelongsTo
+    {
+        return $this->belongsTo(Course::class);
+    }
+
+    public function isCampusWide(): bool
+    {
+        return $this->course_id === null;
     }
 
     /**

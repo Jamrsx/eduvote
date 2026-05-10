@@ -7,8 +7,9 @@ use App\Models\Election;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
-class StoreBallotPositionRequest extends FormRequest
+class StorePartyRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -24,10 +25,20 @@ class StoreBallotPositionRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var Election $election */
+        $election = $this->route('election');
+
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('parties', 'name')->where(
+                    fn ($query) => $query->where('election_id', $election->id),
+                ),
+            ],
+            'short_name' => ['nullable', 'string', 'max:120'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
-            'max_selections' => ['nullable', 'integer', 'min:1', 'max:50'],
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
         ];
     }
@@ -38,10 +49,12 @@ class StoreBallotPositionRequest extends FormRequest
             $this->merge(['course_id' => null]);
         }
 
-        foreach (['sort_order', 'max_selections'] as $field) {
-            if ($this->has($field) && $this->input($field) === '') {
-                $this->merge([$field => null]);
-            }
+        if ($this->has('short_name') && $this->input('short_name') === '') {
+            $this->merge(['short_name' => null]);
+        }
+
+        if ($this->has('sort_order') && $this->input('sort_order') === '') {
+            $this->merge(['sort_order' => null]);
         }
     }
 }

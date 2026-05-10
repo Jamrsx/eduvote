@@ -4,9 +4,9 @@ import {
     BookMarked,
     BookOpen,
     CalendarDays,
+    Flag,
     GraduationCap,
     LayoutGrid,
-    UserSquare2,
     Users,
 } from 'lucide-react';
 import { useMemo } from 'react';
@@ -23,7 +23,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import { index as adminCandidatesIndex } from '@/routes/admin/candidates';
+import { index as adminPartiesIndex } from '@/routes/admin/parties';
 import { index as adminCoursesIndex } from '@/routes/admin/courses';
 import { index as adminElectionsIndex } from '@/routes/admin/elections';
 import { index as adminRosterIndex } from '@/routes/admin/roster';
@@ -79,9 +79,9 @@ export function AppSidebar() {
                 icon: CalendarDays,
             },
             {
-                title: 'Candidates',
-                href: adminCandidatesIndex().url,
-                icon: UserSquare2,
+                title: 'Parties',
+                href: adminPartiesIndex().url,
+                icon: Flag,
             },
         ];
     }, []);

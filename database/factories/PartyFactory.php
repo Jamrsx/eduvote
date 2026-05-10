@@ -20,6 +20,7 @@ class PartyFactory extends Factory
     {
         return [
             'election_id' => Election::factory(),
+            'course_id' => null,
             'name' => fake()->company(),
             'short_name' => fake()->optional()->lexify('???'),
             'sort_order' => fake()->numberBetween(0, 20),

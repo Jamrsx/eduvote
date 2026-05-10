@@ -2,8 +2,8 @@
 
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CourseController;
-use App\Http\Controllers\Admin\ElectionBallotController;
 use App\Http\Controllers\Admin\ElectionController;
+use App\Http\Controllers\Admin\PartyController;
 use App\Http\Controllers\Admin\SchoolRosterController;
 use App\Http\Controllers\Admin\StudentAccountController;
 use App\Http\Controllers\Admin\StudentRegistrationApprovalController;
@@ -38,13 +38,13 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::post('elections', [ElectionController::class, 'store'])->name('elections.store');
     Route::patch('elections/{election}', [ElectionController::class, 'update'])->name('elections.update');
     Route::delete('elections/{election}', [ElectionController::class, 'destroy'])->name('elections.destroy');
-    Route::get('candidates', [ElectionBallotController::class, 'index'])->name('candidates.index');
-    Route::post('elections/{election}/positions', [ElectionBallotController::class, 'storePosition'])->name('elections.positions.store');
-    Route::patch('elections/{election}/positions/{position}', [ElectionBallotController::class, 'updatePosition'])->name('elections.positions.update');
-    Route::delete('elections/{election}/positions/{position}', [ElectionBallotController::class, 'destroyPosition'])->name('elections.positions.destroy');
-    Route::post('elections/{election}/positions/{position}/candidates', [ElectionBallotController::class, 'storeCandidate'])->name('elections.positions.candidates.store');
-    Route::patch('elections/{election}/candidates/{candidate}', [ElectionBallotController::class, 'updateCandidate'])->name('elections.candidates.update');
-    Route::delete('elections/{election}/candidates/{candidate}', [ElectionBallotController::class, 'destroyCandidate'])->name('elections.candidates.destroy');
+    Route::get('parties', [PartyController::class, 'index'])->name('parties.index');
+    Route::post('elections/{election}/parties', [PartyController::class, 'store'])->name('elections.parties.store');
+    Route::patch('elections/{election}/parties/{party}', [PartyController::class, 'update'])->name('elections.parties.update');
+    Route::delete('elections/{election}/parties/{party}', [PartyController::class, 'destroy'])->name('elections.parties.destroy');
+    Route::post('elections/{election}/parties/{party}/candidates', [PartyController::class, 'storeSlateCandidate'])->name('elections.parties.candidates.store');
+    Route::patch('elections/{election}/parties/{party}/candidates/{candidate}', [PartyController::class, 'updateSlateCandidate'])->name('elections.parties.candidates.update');
+    Route::delete('elections/{election}/parties/{party}/candidates/{candidate}', [PartyController::class, 'destroySlateCandidate'])->name('elections.parties.candidates.destroy');
     Route::get('students', [StudentAccountController::class, 'index'])->name('students.index');
     Route::post('students', [StudentAccountController::class, 'store'])->name('students.store');
     Route::get('students/accounts', [StudentAccountController::class, 'accounts'])->name('students.accounts');
