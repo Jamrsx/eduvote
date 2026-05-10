@@ -131,6 +131,9 @@ class ElectionResultController extends Controller
                     'id' => $position->id,
                     'name' => $position->name,
                     'scope_label' => $scopeLabel,
+                    'course_id' => $position->course_id !== null ? (int) $position->course_id : null,
+                    'department_code' => $position->course?->code,
+                    'department_name' => $position->course?->name,
                     'total_votes' => $resultsVisible ? $sumVotes : null,
                     'lines' => $lines,
                 ];

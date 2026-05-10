@@ -2,6 +2,7 @@
 
 use App\Enums\ElectionStatus;
 use App\Models\Candidate;
+use App\Models\Course;
 use App\Models\Election;
 use App\Models\Position;
 use App\Models\User;
@@ -90,7 +91,38 @@ test('closed election exposes vote tallies in inertia props', function () {
         ->where('elections.0.positions.0.lines.0.percent', 66.7)
         ->where('elections.0.positions.0.lines.1.full_name', 'Beta')
         ->where('elections.0.positions.0.lines.1.votes', 1)
-        ->where('elections.0.positions.0.lines.1.percent', 33.3));
+        ->where('elections.0.positions.0.lines.1.percent', 33.3)
+        ->where('elections.0.positions.0.course_id', null)
+        ->where('elections.0.positions.0.department_code', null));
+});
+
+test('election result positions include campus and department scope metadata', function () {
+    $admin = User::factory()->admin()->create();
+    $election = Election::factory()->closed()->create();
+
+    $bsit = Course::factory()->create([
+        'code' => 'BSIT',
+        'name' => 'Information Technology',
+    ]);
+
+    Position::factory()->for($election)->forCampus()->create([
+        'name' => 'President',
+        'sort_order' => 0,
+    ]);
+    Position::factory()->for($election)->forDepartment($bsit->id)->create([
+        'name' => 'Governor — BSIT',
+        'sort_order' => 1,
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.result.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('elections.0.positions.0.course_id', null)
+            ->where('elections.0.positions.0.department_code', null)
+            ->where('elections.0.positions.1.course_id', $bsit->id)
+            ->where('elections.0.positions.1.department_code', 'BSIT')
+            ->where('elections.0.positions.1.department_name', 'Information Technology'));
 });
 
 test('non-closed election hides vote counts in results payload', function () {
