@@ -6,7 +6,6 @@ use App\Enums\ElectionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Election;
 use App\Models\Vote;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -110,9 +109,7 @@ class ElectionResultController extends Controller
                         'candidate_id' => $candidate->id,
                         'full_name' => $candidate->full_name,
                         'party_name' => $candidate->party?->name ?? null,
-                        'photo_url' => $candidate->photo_path !== null
-                            ? Storage::disk('public')->url($candidate->photo_path)
-                            : null,
+                        'photo_url' => $candidate->photoPublicUrl(),
                         'votes' => $voteCount,
                         'percent' => $pct,
                         'leading' => $resultsVisible && $maxVotes > 0 && $voteCount === $maxVotes,

@@ -84,9 +84,7 @@ class PartyController extends Controller
                         ),
                         'platform' => $candidate->platform,
                         'candidate_course_id' => $candidate->course_id,
-                        'photo_url' => $candidate->photo_path !== null
-                            ? Storage::disk('public')->url($candidate->photo_path)
-                            : null,
+                        'photo_url' => $candidate->photoPublicUrl(),
                     ])->values()->all(),
                 ])->values()->all(),
             ])

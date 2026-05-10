@@ -76,4 +76,16 @@ class Candidate extends Model
     {
         return $this->hasMany(Vote::class);
     }
+
+    /**
+     * Same-origin URL for the stored public-disk photo (avoids depending on a correct {@see config('app.url')}).
+     */
+    public function photoPublicUrl(): ?string
+    {
+        if ($this->photo_path === null || $this->photo_path === '') {
+            return null;
+        }
+
+        return '/storage/'.ltrim((string) $this->photo_path, '/');
+    }
 }

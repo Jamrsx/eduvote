@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Models\Vote;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 final class StudentBallotService
@@ -426,9 +425,7 @@ final class StudentBallotService
                 'full_name' => $candidate->full_name,
                 'party_name' => $party?->name ?? 'Independent',
                 'party_short_name' => $party?->short_name,
-                'photo_url' => $candidate->photo_path !== null
-                    ? Storage::disk('public')->url($candidate->photo_path)
-                    : null,
+                'photo_url' => $candidate->photoPublicUrl(),
                 'platform' => $candidate->platform,
             ];
         }
@@ -520,9 +517,7 @@ final class StudentBallotService
                 'party_short_name' => $party?->short_name,
                 'party_scope_label' => $partyScopeLabel,
                 'party_sort_order' => $party?->sort_order ?? -1,
-                'photo_url' => $candidate->photo_path !== null
-                    ? Storage::disk('public')->url($candidate->photo_path)
-                    : null,
+                'photo_url' => $candidate->photoPublicUrl(),
                 'platform' => $candidate->platform,
             ];
         }
