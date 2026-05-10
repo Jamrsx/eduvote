@@ -9,6 +9,7 @@ test('admin can view admin section index pages', function () {
     foreach ([
         'admin.courses.index',
         'admin.elections.index',
+        'admin.candidates.index',
         'admin.students.index',
         'admin.students.accounts',
         'admin.roster.index',
@@ -29,6 +30,7 @@ test('students cannot view admin section index pages', function () {
     foreach ([
         'admin.courses.index',
         'admin.elections.index',
+        'admin.candidates.index',
         'admin.students.index',
         'admin.students.accounts',
         'admin.roster.index',

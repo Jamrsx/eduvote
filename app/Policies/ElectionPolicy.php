@@ -13,7 +13,7 @@ class ElectionPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->role === UserRole::Admin;
     }
 
     /**
@@ -21,7 +21,7 @@ class ElectionPolicy
      */
     public function view(User $user, Election $election): bool
     {
-        return true;
+        return $user->role === UserRole::Admin;
     }
 
     /**

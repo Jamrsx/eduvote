@@ -6,6 +6,7 @@ import {
     CalendarDays,
     GraduationCap,
     LayoutGrid,
+    UserSquare2,
     Users,
 } from 'lucide-react';
 import { useMemo } from 'react';
@@ -22,6 +23,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminCandidatesIndex } from '@/routes/admin/candidates';
 import { index as adminCoursesIndex } from '@/routes/admin/courses';
 import { index as adminElectionsIndex } from '@/routes/admin/elections';
 import { index as adminRosterIndex } from '@/routes/admin/roster';
@@ -34,59 +36,66 @@ import type { NavItem } from '@/types';
 export function AppSidebar() {
     const { auth, pendingStudentRegistrationCount } = usePage().props;
 
-    const mainNavItems = useMemo((): NavItem[] => {
-        const items: NavItem[] = [];
-
+    const adminCoreNavItems = useMemo((): NavItem[] => {
         const pendingRegistrationDot =
             typeof pendingStudentRegistrationCount === 'number' &&
             pendingStudentRegistrationCount > 0;
 
-        if (auth.user?.role === 'admin') {
-            items.push(
-                {
-                    title: 'Dashboard',
-                    href: adminDashboard(),
-                    icon: LayoutGrid,
-                },
-                {
-                    title: 'Programs',
-                    href: adminCoursesIndex(),
-                    icon: BookOpen,
-                },
-                {
-                    title: 'Elections',
-                    href: adminElectionsIndex(),
-                    icon: CalendarDays,
-                },
-                {
-                    title: 'Students',
-                    href: adminStudentsIndex(),
-                    icon: Users,
-                },
-                {
-                    title: 'Pending student registrations',
-                    href: adminRosterIndex().url,
-                    icon: BookMarked,
-                    notificationDot: pendingRegistrationDot,
-                },
-                {
-                    title: 'Ballots',
-                    href: adminVotingIndex(),
-                    icon: BarChart3,
-                },
-            );
-        }
+        return [
+            {
+                title: 'Dashboard',
+                href: adminDashboard(),
+                icon: LayoutGrid,
+            },
+            {
+                title: 'Programs',
+                href: adminCoursesIndex(),
+                icon: BookOpen,
+            },
+            {
+                title: 'Students',
+                href: adminStudentsIndex(),
+                icon: Users,
+            },
+            {
+                title: 'Pending student registrations',
+                href: adminRosterIndex().url,
+                icon: BookMarked,
+                notificationDot: pendingRegistrationDot,
+            },
+            {
+                title: 'Result',
+                href: adminVotingIndex(),
+                icon: BarChart3,
+            },
+        ];
+    }, [pendingStudentRegistrationCount]);
 
-        if (auth.user?.role === 'student') {
-            items.push({
+    const adminElectionNavItems = useMemo((): NavItem[] => {
+        return [
+            {
+                title: 'Election schedule',
+                href: adminElectionsIndex(),
+                icon: CalendarDays,
+            },
+            {
+                title: 'Candidates',
+                href: adminCandidatesIndex().url,
+                icon: UserSquare2,
+            },
+        ];
+    }, []);
+
+    const studentNavItems = useMemo(
+        (): NavItem[] => [
+            {
                 title: 'Student',
                 href: studentDashboard(),
                 icon: GraduationCap,
-            });
-        }
-
-        return items;
-    }, [auth.user?.role, pendingStudentRegistrationCount]);
+            },
+        ],
+        [],
+    );
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -107,14 +116,23 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain
-                    items={mainNavItems}
-                    groupLabel={
-                        auth.user?.role === 'admin'
-                            ? 'Administration'
-                            : 'Platform'
-                    }
-                />
+                {auth.user?.role === 'admin' ? (
+                    <>
+                        <NavMain
+                            items={adminCoreNavItems}
+                            groupLabel="Administration"
+                        />
+                        <NavMain
+                            items={adminElectionNavItems}
+                            groupLabel="Elections"
+                        />
+                    </>
+                ) : (
+                    <NavMain
+                        items={studentNavItems}
+                        groupLabel="Platform"
+                    />
+                )}
             </SidebarContent>
 
             <SidebarFooter>
