@@ -61,8 +61,8 @@ class AdminDashboardController extends Controller
                     'id' => $election->id,
                     'title' => $election->title,
                     'status' => $election->status->value,
-                    'opens_at' => $election->opens_at?->toIso8601String(),
-                    'closes_at' => $election->closes_at?->toIso8601String(),
+                    'opens_at_display' => $election->opens_at?->format('M j, Y g:i A'),
+                    'closes_at_display' => $election->closes_at?->format('M j, Y g:i A'),
                 ])
                 ->values()
                 ->all(),

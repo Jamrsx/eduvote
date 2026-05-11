@@ -23,8 +23,8 @@ type RecentElection = {
     id: number;
     title: string;
     status: ElectionStatusKey;
-    opens_at: string | null;
-    closes_at: string | null;
+    opens_at_display: string | null;
+    closes_at_display: string | null;
 };
 
 type Stats = {
@@ -53,17 +53,6 @@ const STATUS_LABEL: Record<ElectionStatusKey, string> = {
     open: 'Open',
     closed: 'Closed',
 };
-
-function formatDateTime(iso: string | null): string {
-    if (!iso) {
-        return '—';
-    }
-
-    return new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(iso));
-}
 
 function statusBadgeVariant(
     status: ElectionStatusKey,
@@ -229,13 +218,11 @@ export default function AdminDashboard({ stats, recentElections }: Props) {
                                                 </p>
                                                 <p className="text-xs text-muted-foreground">
                                                     Opens{' '}
-                                                    {formatDateTime(
-                                                        election.opens_at,
-                                                    )}{' '}
+                                                    {election.opens_at_display ??
+                                                        '—'}{' '}
                                                     · Closes{' '}
-                                                    {formatDateTime(
-                                                        election.closes_at,
-                                                    )}
+                                                    {election.closes_at_display ??
+                                                        '—'}
                                                 </p>
                                             </div>
                                             <Badge
