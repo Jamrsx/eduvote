@@ -289,6 +289,46 @@ export function playShineGlareSound(volume = 0.15): void {
     });
 }
 
+/**
+ * Short ascending fanfare when a ballot is submitted (or page shows a submitted ballot).
+ */
+export function playBallotSubmittedCelebration(volume = 0.22): void {
+    runWhenAudioCanRender((ctx) => {
+        const t0 = ctx.currentTime;
+        const freqs = [523.25, 659.25, 783.99, 987.77];
+        const step = 0.07;
+
+        freqs.forEach((freq, index) => {
+            const t = t0 + index * step;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq * 0.5, t);
+            osc.frequency.exponentialRampToValueAtTime(freq, t + 0.05);
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(volume * 0.42, t + 0.028);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.38);
+        });
+
+        const sparkle = ctx.createOscillator();
+        const sparkleG = ctx.createGain();
+        sparkle.type = 'sine';
+        sparkle.frequency.setValueAtTime(2400, t0 + 0.22);
+        sparkle.frequency.exponentialRampToValueAtTime(5200, t0 + 0.42);
+        sparkleG.gain.setValueAtTime(0.0001, t0 + 0.22);
+        sparkleG.gain.exponentialRampToValueAtTime(volume * 0.12, t0 + 0.26);
+        sparkleG.gain.exponentialRampToValueAtTime(0.001, t0 + 0.55);
+        sparkle.connect(sparkleG);
+        sparkleG.connect(ctx.destination);
+        sparkle.start(t0 + 0.22);
+        sparkle.stop(t0 + 0.58);
+    });
+}
+
 export function createThrottledScrambleTick(
     minIntervalMs: number,
 ): (progress: number) => void {

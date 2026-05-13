@@ -2,12 +2,6 @@ import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import { Gamepad2, NotebookPen } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    animateNomineePick,
-    animateSubmitReady,
-    revealBallotScene,
-} from '@/lib/ballot-motion';
-import { bindAnimeScrollReveals } from '@/lib/scroll-reveal-motion';
 import * as VotingController from '@/actions/App/Http/Controllers/Student/VotingController';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +13,13 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    animateNomineePick,
+    animateSubmitReady,
+    prefersReducedMotion,
+    revealBallotScene,
+} from '@/lib/ballot-motion';
+import { runBallotSubmitCelebration } from '@/lib/ballot-submit-celebration';
 import { cn } from '@/lib/utils';
 import { dashboard as studentDashboard } from '@/routes/student';
 
@@ -69,6 +70,9 @@ type Props = {
     ballot_split?: boolean;
     ballot_phase?: 'campus' | 'program';
 };
+
+/** Matches `VotingController@store` flash message after a successful ballot submit. */
+const BALLOT_SAVED_FLASH = 'Your ballot was saved.';
 
 /** Election card has both campus-wide and program-scoped races (unlocked). */
 function electionHasCampusAndProgram(election: ElectionBallotCard): boolean {
@@ -714,6 +718,34 @@ export default function StudentVotingIndex({
         }
     }, [page.props.flash?.success]);
 
+    const ballotCelebrationFiredRef = useRef(false);
+
+    useEffect(() => {
+        if (prefersReducedMotion()) {
+            return;
+        }
+
+        if (ballotCelebrationFiredRef.current) {
+            return;
+        }
+
+        const flashMsg = page.props.flash?.success ?? '';
+        const fromSubmit = flashMsg === BALLOT_SAVED_FLASH;
+        const hasLockedBallot = elections.some((e) => e.ballot_locked);
+
+        if (!fromSubmit && !hasLockedBallot) {
+            return;
+        }
+
+        ballotCelebrationFiredRef.current = true;
+
+        const frame = window.requestAnimationFrame(() => {
+            runBallotSubmitCelebration();
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [elections, page.props.flash?.success]);
+
     const [electionScopeFilter, setElectionScopeFilter] = useState<
         Record<number, ElectionScopeFilterMode>
     >({});
@@ -842,6 +874,7 @@ export default function StudentVotingIndex({
         if (lastRevealSignatureRef.current === electionsRevealSignature) {
             return;
         }
+
         lastRevealSignatureRef.current = electionsRevealSignature;
         revealBallotScene(ballotStageRef.current);
     }, [electionsRevealSignature]);
@@ -851,14 +884,18 @@ export default function StudentVotingIndex({
             if (e.ballot_locked) {
                 continue;
             }
+
             const total = e.races.length;
+
             if (total === 0) {
                 continue;
             }
+
             const filled = e.races.filter(
                 (r) => r.chosen_candidate_id !== null,
             ).length;
             const prev = prevBallotFilledRef.current[e.id] ?? -1;
+
             if (filled === total && prev < total) {
                 window.requestAnimationFrame(() => {
                     const btn = document.querySelector<HTMLElement>(
@@ -867,13 +904,10 @@ export default function StudentVotingIndex({
                     animateSubmitReady(btn);
                 });
             }
+
             prevBallotFilledRef.current[e.id] = filled;
         }
     }, [elections]);
-
-    useEffect(() => {
-        return bindAnimeScrollReveals(ballotStageRef.current);
-    }, [electionsRevealSignature]);
 
     const canOpenProgramStep = computeProgramStepUnlocked(elections);
 
@@ -883,7 +917,7 @@ export default function StudentVotingIndex({
 
             <div
                 ref={ballotStageRef}
-                className="relative flex flex-col gap-8 pb-10"
+                className="relative flex flex-col gap-8 pb-[max(12rem,calc(env(safe-area-inset-bottom,0px)+10rem))]"
             >
                 <div
                     aria-hidden
@@ -968,9 +1002,6 @@ export default function StudentVotingIndex({
                                 );
 
                             const splitCard = electionHasCampusAndProgram(election);
-                            const campusOnlyCard =
-                                campusRaces.length > 0 &&
-                                programRaces.length === 0;
                             const programOnlyCard =
                                 programRaces.length > 0 &&
                                 campusRaces.length === 0;
@@ -1001,7 +1032,6 @@ export default function StudentVotingIndex({
                             return (
                             <Card
                                 key={election.id}
-                                data-scroll-reveal
                                 className="border-border/50 from-card/90 to-card/40 overflow-hidden bg-linear-to-b shadow-[0_20px_50px_-28px_rgba(15,23,42,0.45)] ring-1 ring-white/5 dark:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.65)]"
                             >
                                 <CardHeader className="space-y-1 pb-3">
@@ -1446,8 +1476,7 @@ export default function StudentVotingIndex({
                                 electionHasCampusAndProgram(e),
                         ) ? (
                             <div
-                                data-scroll-reveal
-                                className="border-border/50 flex flex-col gap-3 rounded-xl border bg-card/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                className="border-border/50 bg-card/95 supports-[backdrop-filter]:bg-card/90 sticky bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] z-20 mt-6 flex flex-col gap-4 rounded-xl border px-4 pb-7 pt-4 shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6 sm:pb-8 sm:pt-5"
                             >
                                 <p className="text-muted-foreground text-sm leading-relaxed">
                                     When every campus-wide office is filled
@@ -1479,6 +1508,18 @@ export default function StudentVotingIndex({
                                     </Button>
                                 )}
                             </div>
+                        ) : null}
+                        {ballot_split &&
+                        ballot_phase === 'campus' &&
+                        elections.some(
+                            (e) =>
+                                !e.ballot_locked &&
+                                electionHasCampusAndProgram(e),
+                        ) ? (
+                            <div
+                                aria-hidden
+                                className="pointer-events-none h-[min(18vh,10rem)] w-full shrink-0 sm:h-[min(22vh,12rem)]"
+                            />
                         ) : null}
                     </div>
                 )}
