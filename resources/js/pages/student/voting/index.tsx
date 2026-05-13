@@ -16,7 +16,6 @@ import {
 import {
     animateNomineePick,
     animateSubmitReady,
-    prefersReducedMotion,
     revealBallotScene,
 } from '@/lib/ballot-motion';
 import { runBallotSubmitCelebration } from '@/lib/ballot-submit-celebration';
@@ -721,10 +720,6 @@ export default function StudentVotingIndex({
     const ballotCelebrationFiredRef = useRef(false);
 
     useEffect(() => {
-        if (prefersReducedMotion()) {
-            return;
-        }
-
         if (ballotCelebrationFiredRef.current) {
             return;
         }

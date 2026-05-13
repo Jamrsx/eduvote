@@ -128,11 +128,7 @@ function MissionPanel({
         const panel = panelRef.current;
         const shine = shineRef.current;
 
-        if (!panel || !shine) {
-            return;
-        }
-
-        if (prefersReducedMotion()) {
+        if (!panel) {
             return;
         }
 
@@ -142,14 +138,19 @@ function MissionPanel({
             }
 
             shinePlayedRef.current = true;
-            const sweep = Math.max(panel.offsetWidth * 0.9, 200);
-
-            shine.style.opacity = '0';
             playShineGlareSound(0.11);
             console.log(
                 '[StudentDashboard] active ballot shine + shing',
                 voteShineKey,
             );
+
+            if (prefersReducedMotion() || !shine) {
+                return;
+            }
+
+            const sweep = Math.max(panel.offsetWidth * 0.9, 200);
+
+            shine.style.opacity = '0';
 
             void animate(shine, {
                 opacity: [0, 0.78, 0],

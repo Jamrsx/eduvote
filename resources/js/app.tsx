@@ -1,4 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { StudentLoginBootProvider } from '@/components/student-login-boot';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -38,10 +39,12 @@ createInertiaApp({
     strictMode: true,
     withApp(app) {
         return (
-            <TooltipProvider delayDuration={0}>
-                {app}
-                <Toaster />
-            </TooltipProvider>
+            <StudentLoginBootProvider>
+                <TooltipProvider delayDuration={0}>
+                    {app}
+                    <Toaster />
+                </TooltipProvider>
+            </StudentLoginBootProvider>
         );
     },
     progress: {

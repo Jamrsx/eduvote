@@ -251,7 +251,7 @@ function runBallotSubmitCelebrationVisual(): void {
  * wrap + staggered {@link https://animejs.com/documentation/animation animate}, and celebration audio.
  */
 export function runBallotSubmitCelebration(): void {
-    if (typeof window === 'undefined' || prefersReducedMotion()) {
+    if (typeof window === 'undefined') {
         return;
     }
 
@@ -264,8 +264,15 @@ export function runBallotSubmitCelebration(): void {
     }
 
     lastCelebrationAt = now;
-    console.log('[ballot-submit-celebration] celebration run');
 
+    if (prefersReducedMotion()) {
+        console.log('[ballot-submit-celebration] celebration run (audio only)');
+        playBallotSubmittedCelebration(0.18);
+
+        return;
+    }
+
+    console.log('[ballot-submit-celebration] celebration run');
     runBallotSubmitCelebrationVisual();
     playBallotSubmittedCelebration(0.22);
 }

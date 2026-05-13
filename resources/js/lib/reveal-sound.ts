@@ -1,5 +1,3 @@
-import { prefersReducedMotion } from '@/lib/ballot-motion';
-
 const MAX_PENDING_PLAYS = 12;
 
 let sharedAudioContext: AudioContext | null = null;
@@ -25,7 +23,7 @@ function getAudioContextConstructor(): (typeof AudioContext) | null {
  * plays are queued and flushed once the context reaches `"running"`.
  */
 function ensureAudioContextExists(): AudioContext | null {
-    if (typeof window === 'undefined' || prefersReducedMotion()) {
+    if (typeof window === 'undefined') {
         return null;
     }
 
@@ -79,8 +77,32 @@ function flushPendingPlays(): void {
 }
 
 /**
- * Registers a single global listener so the first pointer or key press
- * creates the context (if missing) and resumes it — no page-level "prime" taps.
+ * Creates/resumes the shared AudioContext inside the current user-activation stack.
+ * Use from primary controls (e.g. login submit) via `pointerdown` capture so strict
+ * browsers allow `resume()` before async Inertia work finishes.
+ */
+export function touchRevealAudioFromUserGesture(): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    const Ctx = getAudioContextConstructor();
+
+    if (!Ctx) {
+        return;
+    }
+
+    if (!sharedAudioContext) {
+        sharedAudioContext = new Ctx();
+        console.log('[reveal-sound] AudioContext created (explicit gesture sync)');
+    }
+
+    void resumeRevealAudio();
+}
+
+/**
+ * Registers global listeners so the first pointer, key, click, or form submit
+ * creates the context (if missing) and resumes it.
  */
 export function ensureRevealAudioUnlockedFromGesture(): void {
     if (gestureBound || typeof window === 'undefined') {
@@ -90,33 +112,20 @@ export function ensureRevealAudioUnlockedFromGesture(): void {
     gestureBound = true;
 
     const unlockFromUserGesture = (): void => {
-        if (prefersReducedMotion()) {
-            return;
-        }
-
-        const Ctx = getAudioContextConstructor();
-
-        if (!Ctx) {
-            return;
-        }
-
-        if (!sharedAudioContext) {
-            sharedAudioContext = new Ctx();
-            console.log('[reveal-sound] AudioContext created on user gesture');
-        }
-
-        void resumeRevealAudio();
+        touchRevealAudioFromUserGesture();
     };
 
     window.addEventListener('pointerdown', unlockFromUserGesture, { capture: true, passive: true });
     window.addEventListener('keydown', unlockFromUserGesture, { capture: true, passive: true });
+    window.addEventListener('click', unlockFromUserGesture, { capture: true, passive: true });
+    window.addEventListener('submit', unlockFromUserGesture, { capture: true, passive: true });
 }
 
 /**
  * Resumes the shared context (deduped). Returns whether audio is in the "running" state.
  */
 export async function resumeRevealAudio(): Promise<boolean> {
-    if (typeof window === 'undefined' || prefersReducedMotion()) {
+    if (typeof window === 'undefined') {
         return false;
     }
 

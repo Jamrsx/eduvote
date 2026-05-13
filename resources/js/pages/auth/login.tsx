@@ -1,13 +1,18 @@
+import { Form, Head, Link } from '@inertiajs/react';
 import AuthenticatedSessionController from '@/actions/Laravel/Fortify/Http/Controllers/AuthenticatedSessionController';
 import InputError from '@/components/input-error';
+import {
+    shouldShowStudentDashboardBoot,
+    useStudentLoginBootTrigger,
+} from '@/components/student-login-boot';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { request as forgotPasswordRequest } from '@/routes/password';
+import { touchRevealAudioFromUserGesture } from '@/lib/reveal-sound';
 import { register } from '@/routes';
-import { Form, Head, Link } from '@inertiajs/react';
+import { request as forgotPasswordRequest } from '@/routes/password';
 
 type Props = {
     canResetPassword: boolean;
@@ -16,6 +21,8 @@ type Props = {
 };
 
 export default function Login({ canResetPassword, canRegister, status }: Props) {
+    const triggerStudentBoot = useStudentLoginBootTrigger();
+
     return (
         <>
             <Head title="Log in" />
@@ -41,6 +48,14 @@ export default function Login({ canResetPassword, canRegister, status }: Props) 
                     method="post"
                     resetOnSuccess={['password']}
                     className="flex flex-col gap-6"
+                    onSuccess={(page) => {
+                        if (shouldShowStudentDashboardBoot(page)) {
+                            console.log(
+                                '[Login] student dashboard visit — showing boot overlay',
+                            );
+                            triggerStudentBoot();
+                        }
+                    }}
                 >
                     {({ processing, errors }) => (
                         <>
@@ -95,6 +110,10 @@ export default function Login({ canResetPassword, canRegister, status }: Props) 
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"
+                                onPointerDownCapture={() => {
+                                    touchRevealAudioFromUserGesture();
+                                    console.log('[Login] touch reveal audio (pointer capture)');
+                                }}
                             >
                                 Log in
                             </Button>
