@@ -20,7 +20,6 @@ import {
     buildNomineeScramblePlainText,
     runOfficersHeroScrambleIntro,
 } from '@/lib/officers-roster-motion';
-import { ensureRevealAudioUnlockedFromGesture, primeRevealAudioOnUserGesture } from '@/lib/reveal-sound';
 import { bindAnimeScrollReveals } from '@/lib/scroll-reveal-motion';
 import { index as studentVotingIndex } from '@/routes/student/voting';
 
@@ -100,10 +99,6 @@ function OfficersDirectoryHero({
             ref={shellRef}
             data-officers-hero
             data-officers-hero-shell
-            onPointerDownCapture={() => {
-                primeRevealAudioOnUserGesture();
-                console.log('[OfficersDirectoryHero] prime reveal audio (pointer)');
-            }}
             className="border-border/60 from-card/90 via-card/70 to-muted/30 relative origin-center overflow-hidden rounded-2xl border bg-linear-to-br p-5 shadow-[0_0_48px_-18px_rgba(124,58,237,0.35)] sm:p-6"
         >
             <div
@@ -279,7 +274,6 @@ export default function StudentOfficersIndex({
             return () => {};
         }
 
-        ensureRevealAudioUnlockedFromGesture();
         const unbindNomineeRows = bindOfficerNomineeScrollRows(stage);
         const heroFrame = requestAnimationFrame(() => {
             void runOfficersHeroScrambleIntro(heroRefs);
@@ -320,13 +314,7 @@ export default function StudentOfficersIndex({
         <>
             <Head title="Nominees & platforms" />
 
-            <div
-                ref={rosterStageRef}
-                onPointerDownCapture={() => {
-                    primeRevealAudioOnUserGesture();
-                }}
-                className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-10"
-            >
+            <div ref={rosterStageRef} className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-10">
                 <div
                     aria-hidden
                     className="pointer-events-none fixed inset-0 -z-10 opacity-[0.35] dark:opacity-50"

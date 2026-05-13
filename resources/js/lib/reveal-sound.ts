@@ -1,12 +1,86 @@
 import { prefersReducedMotion } from '@/lib/ballot-motion';
 
+const MAX_PENDING_PLAYS = 12;
+
 let sharedAudioContext: AudioContext | null = null;
 let gestureBound = false;
 let resumePromise: Promise<boolean> | null = null;
+const pendingPlays: Array<(ctx: AudioContext) => void> = [];
+
+function getAudioContextConstructor(): (typeof AudioContext) | null {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    return (
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ??
+        null
+    );
+}
 
 /**
- * Browsers require a user gesture before AudioContext can run; call once from the app shell.
- * Also resumes an existing context on pointer/key.
+ * Lazily creates the shared context when something tries to play.
+ * Browsers still require a user gesture before `resume()` succeeds; until then,
+ * plays are queued and flushed once the context reaches `"running"`.
+ */
+function ensureAudioContextExists(): AudioContext | null {
+    if (typeof window === 'undefined' || prefersReducedMotion()) {
+        return null;
+    }
+
+    if (sharedAudioContext) {
+        return sharedAudioContext;
+    }
+
+    const Ctx = getAudioContextConstructor();
+
+    if (!Ctx) {
+        return null;
+    }
+
+    sharedAudioContext = new Ctx();
+
+    return sharedAudioContext;
+}
+
+function enqueuePlay(play: (ctx: AudioContext) => void): void {
+    if (pendingPlays.length >= MAX_PENDING_PLAYS) {
+        pendingPlays.shift();
+    }
+
+    pendingPlays.push(play);
+}
+
+function flushPendingPlays(): void {
+    const ctx = sharedAudioContext;
+
+    if (!ctx || ctx.state !== 'running') {
+        return;
+    }
+
+    const count = pendingPlays.length;
+
+    while (pendingPlays.length > 0) {
+        const play = pendingPlays.shift();
+
+        if (play) {
+            try {
+                play(ctx);
+            } catch {
+                // Ignore failed one-shots (e.g. context edge cases).
+            }
+        }
+    }
+
+    if (count > 0) {
+        console.log('[reveal-sound] flushed pending plays', { count });
+    }
+}
+
+/**
+ * Registers a single global listener so the first pointer or key press
+ * creates the context (if missing) and resumes it — no page-level "prime" taps.
  */
 export function ensureRevealAudioUnlockedFromGesture(): void {
     if (gestureBound || typeof window === 'undefined') {
@@ -15,34 +89,27 @@ export function ensureRevealAudioUnlockedFromGesture(): void {
 
     gestureBound = true;
 
-    const resume = (): void => {
-        primeRevealAudioOnUserGesture();
+    const unlockFromUserGesture = (): void => {
+        if (prefersReducedMotion()) {
+            return;
+        }
+
+        const Ctx = getAudioContextConstructor();
+
+        if (!Ctx) {
+            return;
+        }
+
+        if (!sharedAudioContext) {
+            sharedAudioContext = new Ctx();
+            console.log('[reveal-sound] AudioContext created on user gesture');
+        }
+
+        void resumeRevealAudio();
     };
 
-    window.addEventListener('pointerdown', resume, { capture: true, passive: true });
-    window.addEventListener('keydown', resume, { capture: true, passive: true });
-}
-
-/**
- * Call from a pointer handler (e.g. capture on the hero) so Safari/Chrome get a fresh context
- * created inside the user-gesture stack when possible.
- */
-export function primeRevealAudioOnUserGesture(): void {
-    if (typeof window === 'undefined' || prefersReducedMotion()) {
-        return;
-    }
-
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-
-    if (!Ctx) {
-        return;
-    }
-
-    if (!sharedAudioContext) {
-        sharedAudioContext = new Ctx();
-    }
-
-    void resumeRevealAudio();
+    window.addEventListener('pointerdown', unlockFromUserGesture, { capture: true, passive: true });
+    window.addEventListener('keydown', unlockFromUserGesture, { capture: true, passive: true });
 }
 
 /**
@@ -60,6 +127,8 @@ export async function resumeRevealAudio(): Promise<boolean> {
     }
 
     if (ctx.state === 'running') {
+        flushPendingPlays();
+
         return true;
     }
 
@@ -69,7 +138,15 @@ export async function resumeRevealAudio(): Promise<boolean> {
 
     resumePromise ??= ctx
         .resume()
-        .then(() => ctx.state === 'running')
+        .then(() => {
+            const ok = ctx.state === 'running';
+
+            if (ok) {
+                flushPendingPlays();
+            }
+
+            return ok;
+        })
         .catch(() => false)
         .finally(() => {
             resumePromise = null;
@@ -79,19 +156,28 @@ export async function resumeRevealAudio(): Promise<boolean> {
 }
 
 function runWhenAudioCanRender(play: (ctx: AudioContext) => void): void {
-    const ctx = sharedAudioContext;
+    const ctx = ensureAudioContextExists();
 
     if (!ctx) {
         return;
     }
 
-    void resumeRevealAudio().then((ok) => {
-        if (!ok || ctx.state !== 'running') {
-            return;
+    if (ctx.state === 'running') {
+        try {
+            play(ctx);
+        } catch {
+            // Ignore failed one-shots.
         }
 
-        play(ctx);
-    });
+        return;
+    }
+
+    if (ctx.state === 'closed') {
+        return;
+    }
+
+    enqueuePlay(play);
+    void resumeRevealAudio();
 }
 
 /**
