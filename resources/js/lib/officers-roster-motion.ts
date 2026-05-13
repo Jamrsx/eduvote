@@ -210,6 +210,44 @@ function applyNomineeRowFinalState(
     photo.style.transform = 'translateX(0)';
     copy.textContent = plain;
     row.setAttribute(NOMINEE_REVEALED_ATTR, 'true');
+    void runNomineeCardShine(row);
+}
+
+function resetNomineeCardShine(row: HTMLElement): void {
+    const shine = row.querySelector<HTMLElement>('[data-officer-nominee-shine]');
+
+    if (!shine) {
+        return;
+    }
+
+    shine.style.opacity = '0';
+    shine.style.removeProperty('transform');
+}
+
+async function runNomineeCardShine(row: HTMLElement): Promise<void> {
+    if (prefersReducedMotion()) {
+        return;
+    }
+
+    const shine = row.querySelector<HTMLElement>('[data-officer-nominee-shine]');
+
+    if (!shine) {
+        return;
+    }
+
+    const sweep = Math.max(row.offsetWidth * 0.9, 200);
+
+    shine.style.opacity = '0';
+
+    await animate(shine, {
+        opacity: [0, 0.78, 0],
+        x: [-sweep * 0.35, sweep * 0.92],
+        duration: 820,
+        ease: 'out(2)',
+    }).then();
+
+    shine.style.opacity = '0';
+    shine.style.removeProperty('transform');
 }
 
 function isNearDocumentBottom(thresholdPx: number): boolean {
@@ -309,6 +347,7 @@ export function bindOfficerNomineeScrollRows(
             onComplete: () => {
                 activeTimelines.delete(row);
                 row.setAttribute(NOMINEE_REVEALED_ATTR, 'true');
+                void runNomineeCardShine(row);
             },
         });
 
@@ -386,6 +425,7 @@ export function bindOfficerNomineeScrollRows(
         for (const [row, timeline] of pending) {
             timeline.revert();
             activeTimelines.delete(row);
+            resetNomineeCardShine(row);
 
             const photo = row.querySelector<HTMLElement>('[data-officer-nominee-photo]');
             const copy = row.querySelector<HTMLElement>('[data-officer-nominee-copy]');

@@ -178,11 +178,16 @@ function OfficerNomineeCard({
         <div
             data-officer-nominee-row
             data-officers-card-wrap
-            className="border-border/50 from-muted/25 to-card/40 group flex h-full min-h-0 flex-col rounded-xl border bg-linear-to-b p-3 shadow-md ring-1 ring-white/5 transition-[border-color,box-shadow] duration-200 sm:p-4"
+            className="border-border/50 from-muted/25 to-card/40 group relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-linear-to-b p-3 shadow-md ring-1 ring-white/5 transition-[border-color,box-shadow] duration-200 sm:p-4"
             onMouseEnter={(event) => {
                 onCardPeek?.(event.currentTarget);
             }}
         >
+            <div
+                data-officer-nominee-shine
+                aria-hidden
+                className="pointer-events-none absolute inset-y-1 left-0 z-[8] w-[46%] skew-x-[-10deg] bg-linear-to-r from-transparent via-white/32 to-transparent opacity-0 mix-blend-screen"
+            />
             <p className="sr-only">
                 {nominee.full_name}. Partylist {nominee.party_name}
                 {nominee.party_short_name
@@ -190,7 +195,7 @@ function OfficerNomineeCard({
                     : ''}
                 . {nominee.party_scope_label}. Platform: {platformForSr}
             </p>
-            <div className="flex min-h-0 flex-1 items-start gap-3 sm:gap-4">
+            <div className="relative z-[10] flex min-h-0 flex-1 items-start gap-3 sm:gap-4">
                 <div
                     data-officer-nominee-photo
                     className="border-border/60 bg-muted/50 flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border ring-1 ring-white/5 sm:h-28 sm:w-24"
