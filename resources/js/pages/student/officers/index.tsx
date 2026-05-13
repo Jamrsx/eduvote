@@ -1,9 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { Sparkles, UsersRound } from 'lucide-react';
+import type { RefObject } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { animateNomineePick } from '@/lib/ballot-motion';
-import { revealOfficersDirectory } from '@/lib/officers-directory-motion';
-import { bindAnimeScrollReveals } from '@/lib/scroll-reveal-motion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +12,16 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { animateNomineePick, prefersReducedMotion } from '@/lib/ballot-motion';
+import { revealOfficersDirectory } from '@/lib/officers-directory-motion';
+import {
+    applyOfficersRosterStaticContent,
+    bindOfficerNomineeScrollRows,
+    buildNomineeScramblePlainText,
+    runOfficersHeroScrambleIntro,
+} from '@/lib/officers-roster-motion';
+import { ensureRevealAudioUnlockedFromGesture, primeRevealAudioOnUserGesture } from '@/lib/reveal-sound';
+import { bindAnimeScrollReveals } from '@/lib/scroll-reveal-motion';
 import { index as studentVotingIndex } from '@/routes/student/voting';
 
 type DirectoryNominee = {
@@ -74,39 +82,68 @@ function VersusDivider() {
 
 function OfficersDirectoryHero({
     studentCourseLabel,
+    kickerRef,
+    titleRef,
+    bodyRef,
+    shellRef,
+    shineRef,
 }: {
     studentCourseLabel: string | null;
+    kickerRef: RefObject<HTMLSpanElement | null>;
+    titleRef: RefObject<HTMLSpanElement | null>;
+    bodyRef: RefObject<HTMLSpanElement | null>;
+    shellRef: RefObject<HTMLDivElement | null>;
+    shineRef: RefObject<HTMLDivElement | null>;
 }) {
     return (
         <div
-            data-officers-reveal
-            className="border-border/60 from-card/90 via-card/70 to-muted/30 relative overflow-hidden rounded-2xl border bg-linear-to-br p-5 shadow-[0_0_48px_-18px_rgba(124,58,237,0.35)] sm:p-6"
+            ref={shellRef}
+            data-officers-hero
+            data-officers-hero-shell
+            onPointerDownCapture={() => {
+                primeRevealAudioOnUserGesture();
+                console.log('[OfficersDirectoryHero] prime reveal audio (pointer)');
+            }}
+            className="border-border/60 from-card/90 via-card/70 to-muted/30 relative origin-center overflow-hidden rounded-2xl border bg-linear-to-br p-5 shadow-[0_0_48px_-18px_rgba(124,58,237,0.35)] sm:p-6"
         >
             <div
+                ref={shineRef}
                 aria-hidden
-                className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-violet-500/15 blur-3xl"
+                className="pointer-events-none absolute inset-y-0 left-0 z-[12] w-[48%] skew-x-[-12deg] bg-linear-to-r from-transparent via-white/40 to-transparent opacity-0 mix-blend-screen"
             />
             <div
                 aria-hidden
-                className="pointer-events-none absolute -bottom-24 -left-10 size-52 rounded-full bg-cyan-500/10 blur-3xl"
+                className="pointer-events-none absolute -right-16 -top-20 z-[1] size-56 rounded-full bg-violet-500/15 blur-3xl"
             />
-            <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div
+                aria-hidden
+                className="pointer-events-none absolute -bottom-24 -left-10 z-[1] size-52 rounded-full bg-cyan-500/10 blur-3xl"
+            />
+            <div className="relative z-[16] flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-2">
+                    <p className="sr-only">
+                        Nominee roster. Nominees and platforms. Campus-wide
+                        seats and your program slate — the same offices you see
+                        on the Vote page. Scheduled elections show nominees
+                        early; you can only cast votes when the window is open.
+                    </p>
                     <div className="text-primary flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
                         <Sparkles className="size-4" aria-hidden />
-                        <span>Nominee roster</span>
+                        <span ref={kickerRef} aria-hidden="true" />
                     </div>
-                    <h1 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
-                        Nominees & platforms
+                    <h1 className="text-foreground min-h-[1.75rem] text-xl font-bold tracking-tight sm:text-2xl">
+                        <span
+                            ref={titleRef}
+                            aria-hidden="true"
+                            className="block min-h-[1.5rem]"
+                        />
                     </h1>
-                    <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-                        Campus-wide seats and{' '}
-                        <span className="text-foreground font-medium">
-                            your program
-                        </span>{' '}
-                        slate — the same offices you see on the Vote page.
-                        Scheduled elections show nominees early; you can only
-                        cast votes when the window is open.
+                    <p className="text-muted-foreground max-w-2xl min-h-[4.5rem] text-sm leading-relaxed">
+                        <span
+                            ref={bodyRef}
+                            aria-hidden="true"
+                            className="block min-h-[4rem]"
+                        />
                     </p>
                 </div>
                 {studentCourseLabel ? (
@@ -131,20 +168,37 @@ function OfficerNomineeCard({
     nominee: DirectoryNominee;
     onCardPeek?: (element: HTMLElement) => void;
 }) {
+    const scrambleSource = buildNomineeScramblePlainText(nominee);
+    const platformForSr =
+        nominee.platform?.trim() !== '' && nominee.platform !== null
+            ? nominee.platform.trim()
+            : 'No platform submitted.';
+
     return (
         <div
+            data-officer-nominee-row
             data-officers-card-wrap
             className="border-border/50 from-muted/25 to-card/40 group flex h-full min-h-0 flex-col rounded-xl border bg-linear-to-b p-3 shadow-md ring-1 ring-white/5 transition-[border-color,box-shadow] duration-200 sm:p-4"
             onMouseEnter={(event) => {
                 onCardPeek?.(event.currentTarget);
             }}
         >
+            <p className="sr-only">
+                {nominee.full_name}. Partylist {nominee.party_name}
+                {nominee.party_short_name
+                    ? `, short name ${nominee.party_short_name}`
+                    : ''}
+                . {nominee.party_scope_label}. Platform: {platformForSr}
+            </p>
             <div className="flex min-h-0 flex-1 items-start gap-3 sm:gap-4">
-                <div className="border-border/60 bg-muted/50 flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border ring-1 ring-white/5 sm:h-28 sm:w-24">
+                <div
+                    data-officer-nominee-photo
+                    className="border-border/60 bg-muted/50 flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border ring-1 ring-white/5 sm:h-28 sm:w-24"
+                >
                     {nominee.photo_url ? (
                         <img
                             src={nominee.photo_url}
-                            alt={nominee.full_name}
+                            alt=""
                             loading="lazy"
                             decoding="async"
                             className="h-full w-full object-contain object-center"
@@ -155,36 +209,12 @@ function OfficerNomineeCard({
                         </span>
                     )}
                 </div>
-                <div className="min-w-0 flex-1 space-y-2">
-                    <p className="text-foreground text-sm font-semibold leading-tight sm:text-[15px]">
-                        {nominee.full_name}
-                    </p>
-                    <p className="text-xs leading-relaxed">
-                        <span className="text-muted-foreground font-semibold">
-                            Partylist:
-                        </span>{' '}
-                        <span className="text-foreground font-medium">
-                            {nominee.party_name}
-                        </span>
-                        {nominee.party_short_name ? (
-                            <span className="text-muted-foreground font-normal">
-                                {` (${nominee.party_short_name})`}
-                            </span>
-                        ) : null}
-                    </p>
-                    <p className="text-muted-foreground text-[11px] font-semibold">
-                        {nominee.party_scope_label}
-                    </p>
-                    <div className="pt-0.5">
-                        <span className="text-muted-foreground text-[11px] font-semibold">
-                            Platform:
-                        </span>
-                        <p className="text-foreground/90 mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed sm:text-sm">
-                            {nominee.platform?.trim() ??
-                                'No platform submitted.'}
-                        </p>
-                    </div>
-                </div>
+                <div
+                    data-officer-nominee-copy
+                    data-scramble-text={encodeURIComponent(scrambleSource)}
+                    aria-hidden="true"
+                    className="text-foreground/90 min-h-[5.5rem] min-w-0 flex-1 whitespace-pre-wrap break-words text-xs leading-relaxed sm:text-sm"
+                />
             </div>
         </div>
     );
@@ -196,6 +226,11 @@ export default function StudentOfficersIndex({
     voter_scope_notice,
 }: Props) {
     const rosterStageRef = useRef<HTMLDivElement>(null);
+    const heroKickerRef = useRef<HTMLSpanElement>(null);
+    const heroTitleRef = useRef<HTMLSpanElement>(null);
+    const heroBodyRef = useRef<HTMLSpanElement>(null);
+    const heroShellRef = useRef<HTMLDivElement>(null);
+    const heroShineRef = useRef<HTMLDivElement>(null);
     const lastPeekAtRef = useRef(0);
 
     const officersRevealSignature = elections
@@ -215,19 +250,54 @@ export default function StudentOfficersIndex({
         if (lastOfficersRevealSignatureRef.current === officersRevealSignature) {
             return;
         }
+
         lastOfficersRevealSignatureRef.current = officersRevealSignature;
         revealOfficersDirectory(rosterStageRef.current);
     }, [officersRevealSignature]);
 
     useEffect(() => {
-        return bindAnimeScrollReveals(rosterStageRef.current);
+        const heroRefs = {
+            kicker: heroKickerRef.current,
+            title: heroTitleRef.current,
+            body: heroBodyRef.current,
+            shell: heroShellRef.current,
+            shine: heroShineRef.current,
+        };
+        const stage = rosterStageRef.current;
+
+        if (prefersReducedMotion()) {
+            applyOfficersRosterStaticContent(heroRefs, stage);
+            console.log(
+                '[StudentOfficersIndex] roster static content (reduced motion)',
+            );
+
+            return () => {};
+        }
+
+        ensureRevealAudioUnlockedFromGesture();
+        const unbindNomineeRows = bindOfficerNomineeScrollRows(stage);
+        const heroFrame = requestAnimationFrame(() => {
+            void runOfficersHeroScrambleIntro(heroRefs);
+        });
+        const unbindScrollReveal = bindAnimeScrollReveals(stage);
+        console.log(
+            '[StudentOfficersIndex] roster motion + scroll reveal bound',
+        );
+
+        return () => {
+            cancelAnimationFrame(heroFrame);
+            unbindNomineeRows();
+            unbindScrollReveal();
+        };
     }, [officersRevealSignature]);
 
     const handleNomineeCardPeek = useCallback((element: HTMLElement) => {
         const now = Date.now();
+
         if (now - lastPeekAtRef.current < 820) {
             return;
         }
+
         lastPeekAtRef.current = now;
         console.log('[StudentOfficersIndex] nominee card peek');
         animateNomineePick(element);
@@ -247,6 +317,9 @@ export default function StudentOfficersIndex({
 
             <div
                 ref={rosterStageRef}
+                onPointerDownCapture={() => {
+                    primeRevealAudioOnUserGesture();
+                }}
                 className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-10"
             >
                 <div
@@ -260,6 +333,11 @@ export default function StudentOfficersIndex({
 
                 <OfficersDirectoryHero
                     studentCourseLabel={student_course_label}
+                    kickerRef={heroKickerRef}
+                    titleRef={heroTitleRef}
+                    bodyRef={heroBodyRef}
+                    shellRef={heroShellRef}
+                    shineRef={heroShineRef}
                 />
 
                 <div
@@ -318,7 +396,6 @@ export default function StudentOfficersIndex({
                         {elections.map((election) => (
                             <Card
                                 key={election.id}
-                                data-scroll-reveal
                                 className="border-border/50 from-card/90 to-card/40 overflow-hidden bg-linear-to-b shadow-[0_20px_50px_-28px_rgba(15,23,42,0.45)] ring-1 ring-white/5 dark:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.65)]"
                             >
                                 <CardHeader className="space-y-1 pb-3">
