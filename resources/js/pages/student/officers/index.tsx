@@ -1,8 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
-import { UsersRound } from 'lucide-react';
-import { useEffect } from 'react';
+import { Sparkles, UsersRound } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { animateNomineePick } from '@/lib/ballot-motion';
+import { revealOfficersDirectory } from '@/lib/officers-directory-motion';
+import { bindAnimeScrollReveals } from '@/lib/scroll-reveal-motion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -61,18 +65,82 @@ function VersusDivider() {
             className="flex items-center justify-center py-2 md:py-0 md:self-center"
             aria-hidden="true"
         >
-            <span className="text-muted-foreground border-border/60 bg-muted/40 rounded-md border px-2.5 py-1 text-[10px] font-bold tracking-widest tabular-nums">
+            <span className="text-muted-foreground border-primary/25 from-violet-500/20 to-cyan-500/15 rounded-lg border bg-linear-to-br px-3 py-1.5 text-[10px] font-bold tracking-[0.2em] tabular-nums shadow-inner">
                 VS
             </span>
         </div>
     );
 }
 
-function OfficerNomineeCard({ nominee }: { nominee: DirectoryNominee }) {
+function OfficersDirectoryHero({
+    studentCourseLabel,
+}: {
+    studentCourseLabel: string | null;
+}) {
     return (
-        <div className="bg-card border-border/70 flex h-full min-h-0 flex-col rounded-md border p-3 shadow-xs sm:p-4">
+        <div
+            data-officers-reveal
+            className="border-border/60 from-card/90 via-card/70 to-muted/30 relative overflow-hidden rounded-2xl border bg-linear-to-br p-5 shadow-[0_0_48px_-18px_rgba(124,58,237,0.35)] sm:p-6"
+        >
+            <div
+                aria-hidden
+                className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-violet-500/15 blur-3xl"
+            />
+            <div
+                aria-hidden
+                className="pointer-events-none absolute -bottom-24 -left-10 size-52 rounded-full bg-cyan-500/10 blur-3xl"
+            />
+            <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-2">
+                    <div className="text-primary flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+                        <Sparkles className="size-4" aria-hidden />
+                        <span>Nominee roster</span>
+                    </div>
+                    <h1 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
+                        Nominees & platforms
+                    </h1>
+                    <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+                        Campus-wide seats and{' '}
+                        <span className="text-foreground font-medium">
+                            your program
+                        </span>{' '}
+                        slate — the same offices you see on the Vote page.
+                        Scheduled elections show nominees early; you can only
+                        cast votes when the window is open.
+                    </p>
+                </div>
+                {studentCourseLabel ? (
+                    <div className="border-border/50 from-violet-500/15 to-cyan-500/10 shrink-0 rounded-xl border bg-linear-to-br px-4 py-3 text-right sm:min-w-[11rem]">
+                        <p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                            Program
+                        </p>
+                        <p className="text-foreground text-sm font-semibold leading-snug">
+                            {studentCourseLabel}
+                        </p>
+                    </div>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+function OfficerNomineeCard({
+    nominee,
+    onCardPeek,
+}: {
+    nominee: DirectoryNominee;
+    onCardPeek?: (element: HTMLElement) => void;
+}) {
+    return (
+        <div
+            data-officers-card-wrap
+            className="border-border/50 from-muted/25 to-card/40 group flex h-full min-h-0 flex-col rounded-xl border bg-linear-to-b p-3 shadow-md ring-1 ring-white/5 transition-[border-color,box-shadow] duration-200 sm:p-4"
+            onMouseEnter={(event) => {
+                onCardPeek?.(event.currentTarget);
+            }}
+        >
             <div className="flex min-h-0 flex-1 items-start gap-3 sm:gap-4">
-                <div className="border-border/70 bg-muted/40 flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border sm:h-28 sm:w-24">
+                <div className="border-border/60 bg-muted/50 flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border ring-1 ring-white/5 sm:h-28 sm:w-24">
                     {nominee.photo_url ? (
                         <img
                             src={nominee.photo_url}
@@ -104,6 +172,9 @@ function OfficerNomineeCard({ nominee }: { nominee: DirectoryNominee }) {
                             </span>
                         ) : null}
                     </p>
+                    <p className="text-muted-foreground text-[11px] font-semibold">
+                        {nominee.party_scope_label}
+                    </p>
                     <div className="pt-0.5">
                         <span className="text-muted-foreground text-[11px] font-semibold">
                             Platform:
@@ -124,6 +195,44 @@ export default function StudentOfficersIndex({
     student_course_label,
     voter_scope_notice,
 }: Props) {
+    const rosterStageRef = useRef<HTMLDivElement>(null);
+    const lastPeekAtRef = useRef(0);
+
+    const officersRevealSignature = elections
+        .map((e) => {
+            const officeKey = [...e.offices]
+                .map((o) => o.position_id)
+                .sort((a, b) => a - b)
+                .join(',');
+
+            return `${e.id}:${e.accepting_votes ? 1 : 0}:${officeKey}`;
+        })
+        .join('|');
+
+    const lastOfficersRevealSignatureRef = useRef<string | null>(null);
+
+    useLayoutEffect(() => {
+        if (lastOfficersRevealSignatureRef.current === officersRevealSignature) {
+            return;
+        }
+        lastOfficersRevealSignatureRef.current = officersRevealSignature;
+        revealOfficersDirectory(rosterStageRef.current);
+    }, [officersRevealSignature]);
+
+    useEffect(() => {
+        return bindAnimeScrollReveals(rosterStageRef.current);
+    }, [officersRevealSignature]);
+
+    const handleNomineeCardPeek = useCallback((element: HTMLElement) => {
+        const now = Date.now();
+        if (now - lastPeekAtRef.current < 820) {
+            return;
+        }
+        lastPeekAtRef.current = now;
+        console.log('[StudentOfficersIndex] nominee card peek');
+        animateNomineePick(element);
+    }, []);
+
     useEffect(() => {
         console.log(
             '[StudentOfficersIndex] elections',
@@ -136,49 +245,44 @@ export default function StudentOfficersIndex({
         <>
             <Head title="Nominees & platforms" />
 
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-                <div className="space-y-1.5">
-                    <h1 className="text-base font-semibold tracking-tight">
-                        Nominees & platforms
-                    </h1>
-                    <p className="text-muted-foreground text-xs leading-relaxed sm:text-sm">
-                        Listed here are nominees for{' '}
-                        <span className="text-foreground font-medium">
-                            campus-wide seats
-                        </span>{' '}
-                        and for{' '}
-                        <span className="text-foreground font-medium">
-                            your program
-                        </span>
-                        {' — '}
-                        the same slate you see when you vote. Scheduled
-                        elections show nominees early; you can vote only when
-                        voting is open.
+            <div
+                ref={rosterStageRef}
+                className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-10"
+            >
+                <div
+                    aria-hidden
+                    className="pointer-events-none fixed inset-0 -z-10 opacity-[0.35] dark:opacity-50"
+                    style={{
+                        background:
+                            'radial-gradient(ellipse 90% 55% at 50% -8%, rgba(124, 58, 237, 0.18), transparent 52%), radial-gradient(ellipse 65% 45% at 100% 0%, rgba(6, 182, 212, 0.1), transparent), var(--background)',
+                    }}
+                />
+
+                <OfficersDirectoryHero
+                    studentCourseLabel={student_course_label}
+                />
+
+                <div
+                    data-scroll-reveal
+                    className="border-border/50 bg-background/75 flex flex-col gap-3 rounded-xl border px-4 py-3 shadow-sm backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <p className="text-muted-foreground text-xs leading-snug sm:text-sm">
+                        Informational only — preview who is running before you
+                        vote.
                     </p>
-                    {student_course_label ? (
-                        <p className="text-muted-foreground text-xs">
-                            Your program:{' '}
-                            <span className="text-foreground font-medium">
-                                {student_course_label}
-                            </span>
-                        </p>
-                    ) : null}
+                    <Button
+                        variant="default"
+                        className="shrink-0 bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-500 hover:to-indigo-500 focus-visible:ring-blue-400/50"
+                        asChild
+                    >
+                        <Link href={studentVotingIndex()} prefetch>
+                            Open Vote page
+                        </Link>
+                    </Button>
                 </div>
 
-                <p className="text-muted-foreground text-xs leading-snug">
-                    Informational only.{' '}
-                    <Link
-                        href={studentVotingIndex()}
-                        prefetch
-                        className="text-primary underline-offset-4 hover:underline"
-                    >
-                        Cast your ballot on the Vote page
-                    </Link>
-                    .
-                </p>
-
                 {voter_scope_notice ? (
-                    <Alert>
+                    <Alert data-scroll-reveal>
                         <AlertTitle>Program slate</AlertTitle>
                         <AlertDescription>
                             {voter_scope_notice}
@@ -187,7 +291,10 @@ export default function StudentOfficersIndex({
                 ) : null}
 
                 {elections.length === 0 ? (
-                    <Card>
+                    <Card
+                        data-officers-reveal
+                        className="border-border/50 from-card/95 to-muted/20 bg-linear-to-br shadow-[0_0_40px_-20px_rgba(124,58,237,0.25)]"
+                    >
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <UsersRound
@@ -199,36 +306,44 @@ export default function StudentOfficersIndex({
                                 </CardTitle>
                             </div>
                             <CardDescription>
-                                Nominees appear when an election is scheduled
-                                or open (and accepting votes once the window
+                                Nominees appear when an election is scheduled or
+                                open (and accepting votes once the window
                                 starts) and you have ballot lines on your
                                 account.
                             </CardDescription>
                         </CardHeader>
                     </Card>
                 ) : (
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-6">
                         {elections.map((election) => (
                             <Card
                                 key={election.id}
-                                className="border-border/70"
+                                data-scroll-reveal
+                                className="border-border/50 from-card/90 to-card/40 overflow-hidden bg-linear-to-b shadow-[0_20px_50px_-28px_rgba(15,23,42,0.45)] ring-1 ring-white/5 dark:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.65)]"
                             >
                                 <CardHeader className="space-y-1 pb-3">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <CardTitle className="text-base font-semibold tracking-tight">
                                             {election.title}
                                         </CardTitle>
-                                        {!election.accepting_votes ? (
+                                        {election.accepting_votes ? (
                                             <Badge
                                                 variant="outline"
-                                                className="border-amber-600/35 bg-amber-600/10 text-amber-950 text-xs dark:text-amber-100"
+                                                className="border-emerald-600/30 bg-emerald-600/10 text-xs text-emerald-900 dark:text-emerald-100"
+                                            >
+                                                Voting open
+                                            </Badge>
+                                        ) : (
+                                            <Badge
+                                                variant="outline"
+                                                className="border-amber-600/35 bg-amber-600/10 text-xs text-amber-950 dark:text-amber-100"
                                             >
                                                 {election.status ===
                                                 'scheduled'
                                                     ? 'Upcoming'
                                                     : 'Not accepting votes'}
                                             </Badge>
-                                        ) : null}
+                                        )}
                                     </div>
                                     {election.description ? (
                                         <CardDescription className="text-xs">
@@ -260,9 +375,8 @@ export default function StudentOfficersIndex({
                                             </AlertTitle>
                                             <AlertDescription>
                                                 Review nominees and platforms
-                                                below. When voting opens, use
-                                                the Vote page to cast your
-                                                ballot.
+                                                below. When voting opens, use the
+                                                Vote page to cast your ballot.
                                             </AlertDescription>
                                         </Alert>
                                     ) : null}
@@ -270,15 +384,18 @@ export default function StudentOfficersIndex({
                                         <section
                                             key={office.position_id}
                                             aria-labelledby={`office-${office.position_id}`}
-                                            className="space-y-3"
+                                            className="border-border/40 space-y-3 rounded-lg p-1 ring-1 ring-transparent transition-shadow hover:ring-primary/15"
                                         >
                                             <div
                                                 id={`office-${office.position_id}`}
                                                 className="border-border/60 border-b pb-2"
                                             >
-                                                <h2 className="text-foreground text-sm font-semibold tracking-tight">
+                                                <h2 className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
                                                     {office.name}
                                                 </h2>
+                                                <p className="text-muted-foreground mt-1 text-xs">
+                                                    {office.scope_label}
+                                                </p>
                                             </div>
 
                                             <ul className="flex flex-col gap-4">
@@ -288,10 +405,14 @@ export default function StudentOfficersIndex({
                                                             key={`${office.position_id}-pair-${pairIdx}`}
                                                             className="list-none"
                                                         >
-                                                            {pair.length === 1 ? (
+                                                            {pair.length ===
+                                                            1 ? (
                                                                 <OfficerNomineeCard
                                                                     nominee={
                                                                         pair[0]!
+                                                                    }
+                                                                    onCardPeek={
+                                                                        handleNomineeCardPeek
                                                                     }
                                                                 />
                                                             ) : (
@@ -300,11 +421,17 @@ export default function StudentOfficersIndex({
                                                                         nominee={
                                                                             pair[0]!
                                                                         }
+                                                                        onCardPeek={
+                                                                            handleNomineeCardPeek
+                                                                        }
                                                                     />
                                                                     <VersusDivider />
                                                                     <OfficerNomineeCard
                                                                         nominee={
                                                                             pair[1]!
+                                                                        }
+                                                                        onCardPeek={
+                                                                            handleNomineeCardPeek
                                                                         }
                                                                     />
                                                                 </div>

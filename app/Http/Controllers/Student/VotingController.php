@@ -17,19 +17,37 @@ class VotingController extends Controller
     /**
      * Open elections and ballot lines scoped to the student's program (plus campus-wide slates).
      */
-    public function index(Request $request, StudentBallotService $ballots): Response
+    public function index(Request $request, StudentBallotService $ballots): Response|RedirectResponse
     {
         $user = $request->user();
         $user->loadMissing(['studentProfile.course:id,code,name']);
 
         $profile = $user->studentProfile;
 
+        $electionCards = $ballots->buildElectionCardsFor($user);
+        $ballotSplit = $ballots->ballotSplitEnabledForCards($electionCards);
+
+        $requestedPhase = strtolower((string) $request->query('phase', 'campus'));
+        $phase = $requestedPhase === 'program' ? 'program' : 'campus';
+
+        if ($ballotSplit && $phase === 'program' && ! $ballots->allSplitBallotCampusSectionsComplete($electionCards)) {
+            return redirect()->route('student.voting.index', [
+                'phase' => 'campus',
+            ]);
+        }
+
+        if (! $ballotSplit) {
+            $phase = 'campus';
+        }
+
         return Inertia::render('student/voting/index', [
             'breadcrumbs' => [
                 ['title' => 'Student', 'href' => route('student.dashboard')],
                 ['title' => 'Vote', 'href' => route('student.voting.index')],
             ],
-            'elections' => $ballots->buildElectionCardsFor($user),
+            'elections' => $electionCards,
+            'ballot_split' => $ballotSplit,
+            'ballot_phase' => $phase,
             'student_course_label' => $profile?->course !== null
                 ? "{$profile->course->code} — {$profile->course->name}"
                 : null,
@@ -67,6 +85,11 @@ class VotingController extends Controller
 
         $ballots->saveBallotProgress($request->user(), $election, $selections);
 
-        return redirect()->route('student.voting.index');
+        /** @var string|null $phase */
+        $phase = $request->validated('phase');
+
+        return redirect()->route('student.voting.index', [
+            'phase' => in_array($phase, ['campus', 'program'], true) ? $phase : 'campus',
+        ]);
     }
 }

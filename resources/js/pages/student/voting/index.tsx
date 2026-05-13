@@ -1,7 +1,13 @@
 import { Form, Head, Link, router, usePage } from '@inertiajs/react';
-import { NotebookPen } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Gamepad2, NotebookPen } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import {
+    animateNomineePick,
+    animateSubmitReady,
+    revealBallotScene,
+} from '@/lib/ballot-motion';
+import { bindAnimeScrollReveals } from '@/lib/scroll-reveal-motion';
 import * as VotingController from '@/actions/App/Http/Controllers/Student/VotingController';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -60,7 +66,156 @@ type Props = {
     elections: ElectionBallotCard[];
     student_course_label: string | null;
     voter_scope_notice: string | null;
+    ballot_split?: boolean;
+    ballot_phase?: 'campus' | 'program';
 };
+
+/** Election card has both campus-wide and program-scoped races (unlocked). */
+function electionHasCampusAndProgram(election: ElectionBallotCard): boolean {
+    if (election.ballot_locked || election.races.length === 0) {
+        return false;
+    }
+
+    const campus = election.races.filter((r) =>
+        isCampusWideScope(r.scope_label),
+    ).length;
+    const program = election.races.filter(
+        (r) => !isCampusWideScope(r.scope_label),
+    ).length;
+
+    return campus > 0 && program > 0;
+}
+
+/** For split cards: all campus-wide lines on this election have a pick. */
+function splitCampusCompleteForElection(election: ElectionBallotCard): boolean {
+    if (!electionHasCampusAndProgram(election)) {
+        return true;
+    }
+
+    return election.races
+        .filter((r) => isCampusWideScope(r.scope_label))
+        .every((r) => r.chosen_candidate_id !== null);
+}
+
+function computeProgramStepUnlocked(
+    electionsList: ElectionBallotCard[],
+): boolean {
+    return electionsList.every(
+        (e) => e.ballot_locked || splitCampusCompleteForElection(e),
+    );
+}
+
+function BallotHiddenRaceChoices({
+    races,
+    electionRaces,
+}: {
+    races: BallotRace[];
+    electionRaces: BallotRace[];
+}) {
+    return (
+        <div className="sr-only" aria-hidden>
+            {races.map((race) => {
+                const selectionIndex = electionRaces.findIndex(
+                    (r) => r.position_id === race.position_id,
+                );
+                const cid = race.chosen_candidate_id;
+
+                if (selectionIndex < 0 || cid === null) {
+                    return null;
+                }
+
+                return (
+                    <div key={race.position_id}>
+                        <input
+                            type="hidden"
+                            name={`selections[${selectionIndex}][position_id]`}
+                            value={race.position_id}
+                        />
+                        <input
+                            type="hidden"
+                            name={`selections[${selectionIndex}][candidate_id]`}
+                            value={cid}
+                        />
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+function BallotPhaseStepper({
+    ballotSplit,
+    ballotPhase,
+    programUnlocked,
+}: {
+    ballotSplit: boolean;
+    ballotPhase: 'campus' | 'program';
+    programUnlocked: boolean;
+}) {
+    if (!ballotSplit) {
+        return null;
+    }
+
+    const campusHref = VotingController.index.url({
+        query: { phase: 'campus' },
+    });
+    const programHref = VotingController.index.url({
+        query: { phase: 'program' },
+    });
+
+    return (
+        <nav
+            aria-label="Ballot steps"
+            className="border-border/50 bg-background/80 flex flex-col gap-3 rounded-2xl border p-4 shadow-sm backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        >
+            <ol className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+                <li className="flex items-center gap-2">
+                    <Link
+                        href={campusHref}
+                        className={cn(
+                            'rounded-full px-3 py-1.5 transition-colors',
+                            ballotPhase === 'campus'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted/60 hover:bg-muted',
+                        )}
+                    >
+                        1 · Campus-wide
+                    </Link>
+                </li>
+                <li aria-hidden className="text-muted-foreground/50">
+                    →
+                </li>
+                <li className="flex items-center gap-2">
+                    {programUnlocked ? (
+                        <Link
+                            href={programHref}
+                            className={cn(
+                                'rounded-full px-3 py-1.5 transition-colors',
+                                ballotPhase === 'program'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted/60 hover:bg-muted',
+                            )}
+                        >
+                            2 · My program
+                        </Link>
+                    ) : (
+                        <span
+                            className="text-muted-foreground/70 cursor-not-allowed rounded-full bg-muted/40 px-3 py-1.5"
+                            title="Choose every campus-wide office first"
+                        >
+                            2 · My program
+                        </span>
+                    )}
+                </li>
+            </ol>
+            <p className="text-muted-foreground max-w-xl text-xs leading-relaxed normal-case">
+                {ballotPhase === 'campus'
+                    ? 'Finish campus-wide offices, then open step 2 for your program slate.'
+                    : 'Campus-wide choices are kept. Finish program offices, then submit each election.'}
+            </p>
+        </nav>
+    );
+}
 
 /** Matches backend ballot `scope_label` for campus races. */
 function isCampusWideScope(scopeLabel: string): boolean {
@@ -69,10 +224,126 @@ function isCampusWideScope(scopeLabel: string): boolean {
 
 export type ElectionScopeFilterMode = 'all' | 'campus' | 'program';
 
+function BallotProgressHud({
+    filled,
+    total,
+}: {
+    filled: number;
+    total: number;
+}) {
+    const pct = total === 0 ? 0 : Math.round((filled / total) * 100);
+
+    return (
+        <div className="mb-5 space-y-1.5">
+            <div className="text-muted-foreground flex items-center justify-between text-[11px] font-semibold tracking-wide uppercase">
+                <span>Ballot progress</span>
+                <span className="text-foreground tabular-nums">
+                    {filled}/{total}
+                </span>
+            </div>
+            <div className="bg-muted/40 border-border/60 h-2 overflow-hidden rounded-full border">
+                <div
+                    className="h-full rounded-full bg-linear-to-r from-violet-500 via-fuchsia-500 to-cyan-400 shadow-[0_0_14px_rgba(168,85,247,0.45)] transition-[width] duration-500 ease-out"
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+        </div>
+    );
+}
+
 function scrollToBallotAnchor(elementId: string): void {
     const el =
         typeof document !== 'undefined' ? document.getElementById(elementId) : null;
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function BallotStageHero({
+    studentCourseLabel,
+    ballotSplit,
+    ballotPhase,
+}: {
+    studentCourseLabel: string | null;
+    ballotSplit: boolean;
+    ballotPhase: 'campus' | 'program';
+}) {
+    const stepTitle =
+        ballotSplit && ballotPhase === 'campus'
+            ? 'Step 1 — Campus-wide ballot'
+            : ballotSplit && ballotPhase === 'program'
+              ? 'Step 2 — My program ballot'
+              : 'Your ballot';
+
+    const stepBody =
+        ballotSplit && ballotPhase === 'campus'
+            ? 'Vote for campus-wide offices first. When every line here has a pick, go to step 2 for your program slate.'
+            : ballotSplit && ballotPhase === 'program'
+              ? 'Program-only races for your course. Campus-wide picks from step 1 stay saved.'
+              : null;
+
+    return (
+        <div
+            data-ballot-reveal
+            className="border-border/60 from-card/90 via-card/70 to-muted/30 relative overflow-hidden rounded-2xl border bg-linear-to-br p-5 shadow-[0_0_48px_-18px_rgba(124,58,237,0.35)] sm:p-6"
+        >
+            <div
+                aria-hidden
+                className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-violet-500/15 blur-3xl"
+            />
+            <div
+                aria-hidden
+                className="pointer-events-none absolute -bottom-24 -left-10 size-52 rounded-full bg-cyan-500/10 blur-3xl"
+            />
+            <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-2">
+                    <div className="text-primary flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+                        <Gamepad2 className="size-4" aria-hidden />
+                        <span>Ballot</span>
+                    </div>
+                    <h1 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
+                        {stepTitle}
+                    </h1>
+                    {stepBody ? (
+                        <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+                            {stepBody}
+                        </p>
+                    ) : (
+                        <>
+                            <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+                                You get{' '}
+                                <span className="text-foreground font-medium">
+                                    campus-wide
+                                </span>{' '}
+                                races and, when your profile has a program,
+                                races for{' '}
+                                <span className="text-foreground font-medium">
+                                    that program
+                                </span>
+                                .
+                            </p>
+                            <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+                                <span className="text-foreground font-medium">
+                                    One nominee per section.
+                                </span>{' '}
+                                Each block is one office. Two similar titles are
+                                still two seats—ask an admin if the list should
+                                be merged.
+                            </p>
+                        </>
+                    )}
+                </div>
+                {studentCourseLabel ? (
+                    <div className="border-border/50 from-violet-500/15 to-cyan-500/10 shrink-0 rounded-xl border bg-linear-to-br px-4 py-3 text-right sm:min-w-[11rem]">
+                        <p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                            Program
+                        </p>
+                        <p className="text-foreground text-sm font-semibold leading-snug">
+                            {studentCourseLabel}
+                        </p>
+                    </div>
+                ) : null}
+            </div>
+        </div>
+    );
 }
 
 function BallotScopeFilterToolbar({
@@ -98,10 +369,10 @@ function BallotScopeFilterToolbar({
         <div
             role="toolbar"
             aria-label="Ballot visibility by office scope"
-            className="bg-muted/20 border-border/60 mb-5 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+            className="border-border/50 bg-background/70 mb-5 flex flex-wrap items-center gap-2 rounded-full border px-2 py-2 shadow-inner backdrop-blur-sm"
         >
-            <span className="text-muted-foreground text-[11px] font-medium lg:text-xs">
-                View:
+            <span className="text-muted-foreground px-1 text-[11px] font-semibold tracking-wide uppercase lg:text-xs">
+                View
             </span>
             <div className="flex flex-wrap gap-1.5">
                 <Button
@@ -109,8 +380,9 @@ function BallotScopeFilterToolbar({
                     size="sm"
                     variant={mode === 'all' ? 'secondary' : 'outline'}
                     className={cn(
-                        'h-8 min-h-8 text-xs font-medium',
-                        mode === 'all' && 'shadow-xs',
+                        'h-8 min-h-8 rounded-full text-xs font-semibold transition-transform active:scale-95',
+                        mode === 'all' &&
+                            'shadow-[0_0_18px_-4px_rgba(168,85,247,0.45)]',
                     )}
                     onClick={() => {
                         onChangeMode('all');
@@ -128,8 +400,9 @@ function BallotScopeFilterToolbar({
                     size="sm"
                     variant={mode === 'campus' ? 'secondary' : 'outline'}
                     className={cn(
-                        'h-8 min-h-8 text-xs font-medium',
-                        mode === 'campus' && 'shadow-xs',
+                        'h-8 min-h-8 rounded-full text-xs font-semibold transition-transform active:scale-95',
+                        mode === 'campus' &&
+                            'shadow-[0_0_18px_-4px_rgba(34,211,238,0.35)]',
                     )}
                     onClick={() => {
                         onChangeMode('campus');
@@ -150,8 +423,9 @@ function BallotScopeFilterToolbar({
                     size="sm"
                     variant={mode === 'program' ? 'secondary' : 'outline'}
                     className={cn(
-                        'h-8 min-h-8 text-xs font-medium',
-                        mode === 'program' && 'shadow-xs',
+                        'h-8 min-h-8 rounded-full text-xs font-semibold transition-transform active:scale-95',
+                        mode === 'program' &&
+                            'shadow-[0_0_18px_-4px_rgba(168,85,247,0.35)]',
                     )}
                     onClick={() => {
                         onChangeMode('program');
@@ -185,8 +459,8 @@ function VoteRaceFieldset({
     ) => void;
 }) {
     return (
-        <fieldset className="bg-muted/10 space-y-3 rounded-lg border p-4">
-            <legend className="text-foreground px-1 text-sm font-semibold">
+        <fieldset className="border-border/50 from-muted/25 to-card/40 space-y-3 rounded-xl border bg-linear-to-b p-4 shadow-sm sm:p-5">
+            <legend className="text-foreground px-1 text-sm font-bold tracking-tight">
                 {race.name}
             </legend>
             <input
@@ -265,7 +539,7 @@ function VersusDivider() {
             className="flex items-center justify-center py-2 md:py-0 md:self-center"
             aria-hidden="true"
         >
-            <span className="text-muted-foreground border-border/60 bg-muted/40 rounded-md border px-2.5 py-1 text-[10px] font-bold tracking-widest tabular-nums">
+            <span className="text-muted-foreground border-primary/25 from-violet-500/20 to-cyan-500/15 rounded-lg border bg-linear-to-br px-3 py-1.5 text-[10px] font-bold tracking-[0.2em] tabular-nums shadow-inner">
                 VS
             </span>
         </div>
@@ -284,11 +558,12 @@ function BallotOptionChoice({
     onChosen?: () => void;
 }) {
     return (
-        <div className="min-h-0">
+        <div className="min-h-0" data-ballot-choice-wrap>
             <label
                 className={cn(
-                    'group flex h-full min-h-0 cursor-pointer items-start gap-3 rounded-md border bg-card p-3 text-sm shadow-xs transition-colors sm:gap-4 sm:p-4',
-                    'border-border/70 hover:bg-muted/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5',
+                    'group flex h-full min-h-0 cursor-pointer items-start gap-3 rounded-xl border bg-card/90 p-3 text-sm shadow-md transition-[border-color,box-shadow,transform] duration-200 sm:gap-4 sm:p-4',
+                    'border-border/60 hover:border-primary/35 hover:shadow-[0_12px_40px_-24px_rgba(124,58,237,0.45)]',
+                    'has-[:checked]:border-primary has-[:checked]:bg-primary/8 has-[:checked]:shadow-[0_0_0_1px_rgba(168,85,247,0.35)]',
                 )}
             >
                 <input
@@ -302,11 +577,15 @@ function BallotOptionChoice({
                     className="accent-primary mt-2 size-4 shrink-0"
                     onChange={(event) => {
                         if (event.currentTarget.checked) {
+                            const wrap = event.currentTarget.closest(
+                                '[data-ballot-choice-wrap]',
+                            ) as HTMLElement | null;
+                            animateNomineePick(wrap);
                             onChosen?.();
                         }
                     }}
                 />
-                <div className="border-border/70 bg-muted/40 flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border sm:h-24 sm:w-20">
+                <div className="border-border/60 bg-muted/50 flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border ring-1 ring-white/5 sm:h-24 sm:w-20">
                     {opt.photo_url ? (
                         <img
                             src={opt.photo_url}
@@ -362,8 +641,8 @@ function CommittedRaceReadonlyCard({ row }: { row: CommittedRace }) {
                     {row.name}
                 </h3>
             </div>
-            <div className="bg-card border-border/70 flex items-start gap-3 rounded-md border p-3 shadow-xs sm:gap-4 sm:p-4">
-                <div className="border-border/70 bg-muted/40 flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border sm:h-24 sm:w-20">
+            <div className="bg-card/95 border-border/60 flex items-start gap-3 rounded-xl border p-3 shadow-md ring-1 ring-white/5 sm:gap-4 sm:p-4">
+                <div className="border-border/60 bg-muted/50 flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border sm:h-24 sm:w-20">
                     {row.photo_url ? (
                         <img
                             src={row.photo_url}
@@ -416,6 +695,8 @@ export default function StudentVotingIndex({
     elections,
     student_course_label,
     voter_scope_notice,
+    ballot_split = false,
+    ballot_phase = 'campus',
 }: Props) {
     const page = usePage<{
         flash?: { success?: string | null };
@@ -491,11 +772,20 @@ export default function StudentVotingIndex({
 
                 progressPendingRef.current[electionId] = {};
 
+                const payload: {
+                    selections: { position_id: number; candidate_id: number }[];
+                    phase?: 'campus' | 'program';
+                } = { selections };
+
+                if (ballot_split) {
+                    payload.phase = ballot_phase;
+                }
+
                 router.post(
                     VotingController.saveProgress.url({
                         election: electionId,
                     }),
-                    { selections },
+                    payload,
                     {
                         preserveScroll: true,
                         preserveState: true,
@@ -530,46 +820,85 @@ export default function StudentVotingIndex({
                 );
             }, 450);
         },
-        [],
+        [ballot_split, ballot_phase],
     );
+
+    const ballotStageRef = useRef<HTMLDivElement>(null);
+    const prevBallotFilledRef = useRef<Record<number, number>>({});
+    /** Ballot lines only — omit picks so autosave does not re-run the entrance animation. */
+    const electionsRevealSignature = `${elections
+        .map((e) => {
+            const positionKey = [...e.races]
+                .map((r) => r.position_id)
+                .sort((a, b) => a - b)
+                .join(',');
+
+            return `${e.id}:${e.ballot_locked ? 1 : 0}:${positionKey}`;
+        })
+        .join('|')}|${ballot_split ? ballot_phase : 'all'}`;
+    const lastRevealSignatureRef = useRef<string | null>(null);
+
+    useLayoutEffect(() => {
+        if (lastRevealSignatureRef.current === electionsRevealSignature) {
+            return;
+        }
+        lastRevealSignatureRef.current = electionsRevealSignature;
+        revealBallotScene(ballotStageRef.current);
+    }, [electionsRevealSignature]);
+
+    useEffect(() => {
+        for (const e of elections) {
+            if (e.ballot_locked) {
+                continue;
+            }
+            const total = e.races.length;
+            if (total === 0) {
+                continue;
+            }
+            const filled = e.races.filter(
+                (r) => r.chosen_candidate_id !== null,
+            ).length;
+            const prev = prevBallotFilledRef.current[e.id] ?? -1;
+            if (filled === total && prev < total) {
+                window.requestAnimationFrame(() => {
+                    const btn = document.querySelector<HTMLElement>(
+                        `[data-submit-ballot="${e.id}"]`,
+                    );
+                    animateSubmitReady(btn);
+                });
+            }
+            prevBallotFilledRef.current[e.id] = filled;
+        }
+    }, [elections]);
+
+    useEffect(() => {
+        return bindAnimeScrollReveals(ballotStageRef.current);
+    }, [electionsRevealSignature]);
+
+    const canOpenProgramStep = computeProgramStepUnlocked(elections);
 
     return (
         <>
             <Head title="Ballot" />
 
-            <div className="flex flex-col gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-lg font-semibold tracking-tight">
-                        Your ballot
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        You get{' '}
-                        <span className="font-medium text-foreground">
-                            campus-wide
-                        </span>{' '}
-                        races and, when your profile has a program, races for{' '}
-                        <span className="font-medium text-foreground">
-                            that program
-                        </span>
-                        .
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                        <span className="font-medium text-foreground">
-                            One nominee per section.
-                        </span>{' '}
-                        Each section is one office (one seat). If two sections
-                        look alike, they are still two offices—ask an admin if
-                        the list should be combined.
-                    </p>
-                    {student_course_label ? (
-                        <p className="text-muted-foreground text-xs">
-                            Program:{' '}
-                            <span className="font-medium text-foreground">
-                                {student_course_label}
-                            </span>
-                        </p>
-                    ) : null}
-                </div>
+            <div
+                ref={ballotStageRef}
+                className="relative flex flex-col gap-8 pb-10"
+            >
+                <div
+                    aria-hidden
+                    className="pointer-events-none fixed inset-0 -z-10 opacity-[0.35] dark:opacity-50"
+                    style={{
+                        background:
+                            'radial-gradient(ellipse 90% 55% at 50% -8%, rgba(124, 58, 237, 0.22), transparent 52%), radial-gradient(ellipse 65% 45% at 100% 0%, rgba(6, 182, 212, 0.12), transparent), var(--background)',
+                    }}
+                />
+
+                <BallotStageHero
+                    studentCourseLabel={student_course_label}
+                    ballotSplit={ballot_split}
+                    ballotPhase={ballot_phase}
+                />
 
                 {voter_scope_notice ? (
                     <Alert>
@@ -580,8 +909,17 @@ export default function StudentVotingIndex({
                     </Alert>
                 ) : null}
 
+                <BallotPhaseStepper
+                    ballotSplit={ballot_split}
+                    ballotPhase={ballot_phase}
+                    programUnlocked={canOpenProgramStep}
+                />
+
                 {elections.length === 0 ? (
-                    <Card>
+                    <Card
+                        data-ballot-reveal
+                        className="border-border/50 from-card/95 to-muted/20 bg-linear-to-br shadow-[0_0_40px_-20px_rgba(124,58,237,0.25)]"
+                    >
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <NotebookPen
@@ -610,7 +948,7 @@ export default function StudentVotingIndex({
                         </CardHeader>
                     </Card>
                 ) : (
-                    <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-6">
                         {elections.map((election) => {
                             const scopeMode =
                                 electionScopeFilter[election.id] ?? 'all';
@@ -629,8 +967,43 @@ export default function StudentVotingIndex({
                                     (r) => !isCampusWideScope(r.scope_label),
                                 );
 
+                            const splitCard = electionHasCampusAndProgram(election);
+                            const campusOnlyCard =
+                                campusRaces.length > 0 &&
+                                programRaces.length === 0;
+                            const programOnlyCard =
+                                programRaces.length > 0 &&
+                                campusRaces.length === 0;
+                            const filterDimming = !ballot_split;
+                            const showCampusVotes =
+                                (!ballot_split ||
+                                    ballot_phase === 'campus') &&
+                                campusRaces.length > 0;
+                            const showProgramVotes =
+                                (!ballot_split ||
+                                    ballot_phase === 'program') &&
+                                programRaces.length > 0;
+                            const progressRaces =
+                                ballot_split &&
+                                campusRaces.length > 0 &&
+                                programRaces.length > 0
+                                    ? ballot_phase === 'campus'
+                                        ? campusRaces
+                                        : programRaces
+                                    : election.races;
+                            const campusHiddenReady =
+                                !splitCard ||
+                                ballot_phase !== 'program' ||
+                                campusRaces.every(
+                                    (r) => r.chosen_candidate_id !== null,
+                                );
+
                             return (
-                            <Card key={election.id}>
+                            <Card
+                                key={election.id}
+                                data-scroll-reveal
+                                className="border-border/50 from-card/90 to-card/40 overflow-hidden bg-linear-to-b shadow-[0_20px_50px_-28px_rgba(15,23,42,0.45)] ring-1 ring-white/5 dark:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.65)]"
+                            >
                                 <CardHeader className="space-y-1 pb-3">
                                     <CardTitle className="text-base">
                                         {election.title}
@@ -767,6 +1140,45 @@ export default function StudentVotingIndex({
                                                 ) : null}
                                             </div>
                                         </div>
+                                    ) : ballot_split &&
+                                      ballot_phase === 'campus' &&
+                                      programOnlyCard ? (
+                                        <div className="text-muted-foreground flex flex-col gap-3 px-6 pb-6 text-sm leading-relaxed">
+                                            <p>
+                                                This election has program-only
+                                                offices. Use step 2 after every
+                                                campus-wide line is filled on
+                                                the ballots that have them.
+                                            </p>
+                                            {canOpenProgramStep ? (
+                                                <Button
+                                                    variant="default"
+                                                    className="w-fit bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-500 hover:to-indigo-500 focus-visible:ring-blue-400/50"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={VotingController.index.url(
+                                                            {
+                                                                query: {
+                                                                    phase: 'program',
+                                                                },
+                                                            },
+                                                        )}
+                                                    >
+                                                        Go to my program ballot
+                                                    </Link>
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    className="w-fit"
+                                                    disabled
+                                                >
+                                                    Go to my program ballot
+                                                </Button>
+                                            )}
+                                        </div>
                                     ) : (
                                         <Form
                                             action={
@@ -795,37 +1207,85 @@ export default function StudentVotingIndex({
                                                         id={`election-${election.id}-ballot-shell`}
                                                         className="flex flex-col gap-6"
                                                     >
-                                                        <BallotScopeFilterToolbar
-                                                            electionId={
-                                                                election.id
-                                                            }
-                                                            mode={scopeMode}
-                                                            onChangeMode={(
-                                                                next,
-                                                            ) =>
-                                                                setScopeForElection(
-                                                                    election.id,
+                                                        {!ballot_split ? (
+                                                            <BallotScopeFilterToolbar
+                                                                electionId={
+                                                                    election.id
+                                                                }
+                                                                mode={scopeMode}
+                                                                onChangeMode={(
                                                                     next,
-                                                                )
+                                                                ) =>
+                                                                    setScopeForElection(
+                                                                        election.id,
+                                                                        next,
+                                                                    )
+                                                                }
+                                                                campusCount={
+                                                                    campusRaces.length
+                                                                }
+                                                                programCount={
+                                                                    programRaces.length
+                                                                }
+                                                            />
+                                                        ) : null}
+                                                        <BallotProgressHud
+                                                            filled={
+                                                                progressRaces.filter(
+                                                                    (r) =>
+                                                                        r.chosen_candidate_id !==
+                                                                        null,
+                                                                ).length
                                                             }
-                                                            campusCount={
-                                                                campusRaces.length
-                                                            }
-                                                            programCount={
-                                                                programRaces.length
+                                                            total={
+                                                                progressRaces.length
                                                             }
                                                         />
-                                                        {campusRaces.length >
-                                                        0 ? (
+                                                        {ballot_split &&
+                                                        ballot_phase ===
+                                                            'program' &&
+                                                        splitCard ? (
+                                                            <BallotHiddenRaceChoices
+                                                                races={
+                                                                    campusRaces
+                                                                }
+                                                                electionRaces={
+                                                                    election.races
+                                                                }
+                                                            />
+                                                        ) : null}
+                                                        {ballot_split &&
+                                                        ballot_phase ===
+                                                            'program' &&
+                                                        splitCard &&
+                                                        !campusHiddenReady ? (
+                                                            <Alert variant="destructive">
+                                                                <AlertTitle>
+                                                                    Campus-wide
+                                                                    choices missing
+                                                                </AlertTitle>
+                                                                <AlertDescription>
+                                                                    Return to
+                                                                    step 1 and
+                                                                    pick every
+                                                                    campus-wide
+                                                                    office before
+                                                                    submitting.
+                                                                </AlertDescription>
+                                                            </Alert>
+                                                        ) : null}
+                                                        {showCampusVotes ? (
                                                             <section
                                                                 id={`election-${election.id}-campus-ballot`}
                                                                 className={cn(
                                                                     'scroll-mt-6 rounded-lg p-1 transition-[opacity,box-shadow] duration-200',
-                                                                    scopeMode ===
-                                                                        'program' &&
+                                                                    filterDimming &&
+                                                                        scopeMode ===
+                                                                            'program' &&
                                                                         'opacity-45',
-                                                                    scopeMode ===
-                                                                        'campus' &&
+                                                                    filterDimming &&
+                                                                        scopeMode ===
+                                                                            'campus' &&
                                                                         'ring-primary/45 ring-offset-background ring-2 ring-offset-2',
                                                                 )}
                                                             >
@@ -868,17 +1328,18 @@ export default function StudentVotingIndex({
                                                                 </div>
                                                             </section>
                                                         ) : null}
-                                                        {programRaces.length >
-                                                        0 ? (
+                                                        {showProgramVotes ? (
                                                             <section
                                                                 id={`election-${election.id}-program-ballot`}
                                                                 className={cn(
                                                                     'scroll-mt-6 rounded-lg p-1 transition-[opacity,box-shadow] duration-200',
-                                                                    scopeMode ===
-                                                                        'campus' &&
+                                                                    filterDimming &&
+                                                                        scopeMode ===
+                                                                            'campus' &&
                                                                         'opacity-45',
-                                                                    scopeMode ===
-                                                                        'program' &&
+                                                                    filterDimming &&
+                                                                        scopeMode ===
+                                                                            'program' &&
                                                                         'ring-primary/45 ring-offset-background ring-2 ring-offset-2',
                                                                 )}
                                                             >
@@ -936,19 +1397,39 @@ export default function StudentVotingIndex({
                                                         </p>
                                                     ) : null}
                                                     <p className="text-muted-foreground text-xs">
-                                                        Autosave keeps picks if you leave this page.
-                                                        Change any office until you submit; the ballot
-                                                        is final only after you press submit.
+                                                        Autosave keeps picks if
+                                                        you leave this page.
+                                                        Change any office until
+                                                        you submit; the ballot is
+                                                        final only after you
+                                                        press submit.
                                                     </p>
-                                                    <Button
-                                                        type="submit"
-                                                        disabled={processing}
-                                                        className="min-h-11 w-full sm:w-auto sm:self-start"
-                                                    >
-                                                        {processing
-                                                            ? 'Saving…'
-                                                            : 'Submit ballot for this election'}
-                                                    </Button>
+                                                    {!(
+                                                        ballot_split &&
+                                                        ballot_phase ===
+                                                            'campus' &&
+                                                        splitCard
+                                                    ) ? (
+                                                        <Button
+                                                            type="submit"
+                                                            data-submit-ballot={
+                                                                election.id
+                                                            }
+                                                            disabled={
+                                                                processing ||
+                                                                (ballot_split &&
+                                                                    ballot_phase ===
+                                                                        'program' &&
+                                                                    splitCard &&
+                                                                    !campusHiddenReady)
+                                                            }
+                                                            className="min-h-11 w-full shadow-[0_0_24px_-8px_rgba(124,58,237,0.55)] transition-transform sm:w-auto sm:self-start"
+                                                        >
+                                                            {processing
+                                                                ? 'Saving…'
+                                                                : 'Submit ballot for this election'}
+                                                        </Button>
+                                                    ) : null}
                                                 </>
                                             )}
                                         </Form>
@@ -957,6 +1438,48 @@ export default function StudentVotingIndex({
                             </Card>
                             );
                         })}
+                        {ballot_split &&
+                        ballot_phase === 'campus' &&
+                        elections.some(
+                            (e) =>
+                                !e.ballot_locked &&
+                                electionHasCampusAndProgram(e),
+                        ) ? (
+                            <div
+                                data-scroll-reveal
+                                className="border-border/50 flex flex-col gap-3 rounded-xl border bg-card/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <p className="text-muted-foreground text-sm leading-relaxed">
+                                    When every campus-wide office is filled
+                                    across your ballots, continue to program
+                                    offices.
+                                </p>
+                                {canOpenProgramStep ? (
+                                    <Button
+                                        variant="default"
+                                        className="min-h-11 shrink-0 bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-500 hover:to-indigo-500 focus-visible:ring-blue-400/50"
+                                        asChild
+                                    >
+                                        <Link
+                                            href={VotingController.index.url({
+                                                query: { phase: 'program' },
+                                            })}
+                                        >
+                                            Continue to my program offices
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="min-h-11 shrink-0"
+                                        disabled
+                                    >
+                                        Continue to my program offices
+                                    </Button>
+                                )}
+                            </div>
+                        ) : null}
                     </div>
                 )}
             </div>

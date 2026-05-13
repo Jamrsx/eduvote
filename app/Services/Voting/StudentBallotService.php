@@ -697,4 +697,89 @@ final class StudentBallotService
             'committed_races' => [],
         ];
     }
+
+    /**
+     * True when any open (unlocked) ballot card has both campus-wide and program-scoped races.
+     *
+     * @param  list<array<string, mixed>>  $cards
+     */
+    public function ballotSplitEnabledForCards(array $cards): bool
+    {
+        foreach ($cards as $card) {
+            if (($card['ballot_locked'] ?? false) === true) {
+                continue;
+            }
+
+            $races = $card['races'] ?? [];
+            $campus = 0;
+            $program = 0;
+
+            foreach ($races as $race) {
+                if (! is_array($race)) {
+                    continue;
+                }
+
+                if ($this->racePayloadIsCampusWide($race)) {
+                    $campus++;
+                } else {
+                    $program++;
+                }
+            }
+
+            if ($campus > 0 && $program > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * For split ballots: every campus-wide office that shares a card with program offices has a choice.
+     *
+     * @param  list<array<string, mixed>>  $cards
+     */
+    public function allSplitBallotCampusSectionsComplete(array $cards): bool
+    {
+        foreach ($cards as $card) {
+            if (($card['ballot_locked'] ?? false) === true) {
+                continue;
+            }
+
+            $races = $card['races'] ?? [];
+            $campusRaces = array_values(array_filter(
+                $races,
+                fn (mixed $race): bool => is_array($race) && $this->racePayloadIsCampusWide($race),
+            ));
+            $hasProgram = false;
+
+            foreach ($races as $race) {
+                if (is_array($race) && ! $this->racePayloadIsCampusWide($race)) {
+                    $hasProgram = true;
+
+                    break;
+                }
+            }
+
+            if ($campusRaces === [] || ! $hasProgram) {
+                continue;
+            }
+
+            foreach ($campusRaces as $race) {
+                if (! is_array($race) || ($race['chosen_candidate_id'] ?? null) === null) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $race
+     */
+    private function racePayloadIsCampusWide(array $race): bool
+    {
+        return strcasecmp(trim((string) ($race['scope_label'] ?? '')), 'Campus-wide') === 0;
+    }
 }

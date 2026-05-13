@@ -65,7 +65,9 @@ test('student sees only campus-wide nominees from other programs on a campus-wid
             ->where('elections.0.ballot_locked', false)
             ->has('elections.0.races', 1)
             ->has('elections.0.races.0.options', 1)
-            ->where('elections.0.races.0.options.0.full_name', 'Campus Nominee'));
+            ->where('elections.0.races.0.options.0.full_name', 'Campus Nominee')
+            ->where('ballot_split', false)
+            ->where('ballot_phase', 'campus'));
 });
 
 test('student sees campus-wide and matching program slate nominees on a campus-wide ballot line', function (): void {
@@ -117,7 +119,9 @@ test('student sees campus-wide and matching program slate nominees on a campus-w
             ->where('elections.0.ballot_locked', false)
             ->has('elections.0.races.0.options', 2)
             ->where('elections.0.races.0.options.0.full_name', 'Campus Nominee')
-            ->where('elections.0.races.0.options.1.full_name', 'EDUC Program Nominee'));
+            ->where('elections.0.races.0.options.1.full_name', 'EDUC Program Nominee')
+            ->where('ballot_split', false)
+            ->where('ballot_phase', 'campus'));
 });
 
 test('student cannot submit another program slate nominee on a campus-wide ballot line', function (): void {
@@ -255,7 +259,7 @@ test('student autosave restores partial ballot choices after revisit', function 
                 ],
             ],
         ])
-        ->assertRedirect(route('student.voting.index'));
+        ->assertRedirect(route('student.voting.index', ['phase' => 'campus']));
 
     expect(Vote::query()->where([
         'user_id' => $student->id,
@@ -342,7 +346,7 @@ test('autosaving every office does not lock the ballot until final submit', func
                 ],
             ],
         ])
-        ->assertRedirect(route('student.voting.index'));
+        ->assertRedirect(route('student.voting.index', ['phase' => 'campus']));
 
     expect(BallotSubmission::query()->where([
         'election_id' => $election->id,
@@ -356,4 +360,120 @@ test('autosaving every office does not lock the ballot until final submit', func
             ->component('student/voting/index')
             ->where('elections.0.ballot_locked', false)
             ->has('elections.0.races', 2));
+});
+
+test('student cannot open program ballot phase until campus-wide lines are complete', function (): void {
+    $election = Election::factory()->acceptingNow()->create();
+    $educ = Course::factory()->create([
+        'code' => 'EDUC',
+        'name' => 'Education',
+    ]);
+
+    $president = Position::factory()->for($election)->forCampus()->create([
+        'name' => 'President',
+        'sort_order' => 0,
+    ]);
+    $programRep = Position::factory()->for($election)->forDepartment($educ->id)->create([
+        'name' => 'Program Representative',
+        'sort_order' => 1,
+    ]);
+
+    $campusParty = Party::factory()->for($election)->create([
+        'course_id' => null,
+        'name' => 'Unity Slate',
+    ]);
+    $educParty = Party::factory()->for($election)->create([
+        'course_id' => $educ->id,
+        'name' => 'EDUC Party',
+    ]);
+
+    $presCand = Candidate::factory()->forBallot($election, $president)->create([
+        'party_id' => $campusParty->id,
+    ]);
+    Candidate::factory()->forBallot($election, $programRep)->create([
+        'party_id' => $educParty->id,
+    ]);
+
+    $student = User::factory()->student()->create();
+    StudentProfile::factory()->create([
+        'user_id' => $student->id,
+        'course_id' => $educ->id,
+    ]);
+
+    $this->actingAs($student)
+        ->get(route('student.voting.index', ['phase' => 'program']))
+        ->assertRedirect(route('student.voting.index', ['phase' => 'campus']));
+
+    Vote::query()->create([
+        'election_id' => $election->id,
+        'user_id' => $student->id,
+        'position_id' => $president->id,
+        'candidate_id' => $presCand->id,
+    ]);
+
+    $this->actingAs($student)
+        ->get(route('student.voting.index', ['phase' => 'program']))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('ballot_split', true)
+            ->where('ballot_phase', 'program')
+            ->has('elections.0.races', 2));
+});
+
+test('ballot progress redirect preserves phase query string', function (): void {
+    $election = Election::factory()->acceptingNow()->create();
+    $educ = Course::factory()->create([
+        'code' => 'EDUC',
+        'name' => 'Education',
+    ]);
+
+    $president = Position::factory()->for($election)->forCampus()->create([
+        'name' => 'President',
+        'sort_order' => 0,
+    ]);
+    $programRep = Position::factory()->for($election)->forDepartment($educ->id)->create([
+        'name' => 'Program Representative',
+        'sort_order' => 1,
+    ]);
+
+    $campusParty = Party::factory()->for($election)->create([
+        'course_id' => null,
+        'name' => 'Unity Slate',
+    ]);
+    $educParty = Party::factory()->for($election)->create([
+        'course_id' => $educ->id,
+        'name' => 'EDUC Party',
+    ]);
+
+    $presCand = Candidate::factory()->forBallot($election, $president)->create([
+        'party_id' => $campusParty->id,
+    ]);
+    Candidate::factory()->forBallot($election, $programRep)->create([
+        'party_id' => $educParty->id,
+    ]);
+
+    $student = User::factory()->student()->create();
+    StudentProfile::factory()->create([
+        'user_id' => $student->id,
+        'course_id' => $educ->id,
+    ]);
+
+    Vote::query()->create([
+        'election_id' => $election->id,
+        'user_id' => $student->id,
+        'position_id' => $president->id,
+        'candidate_id' => $presCand->id,
+    ]);
+
+    $this->actingAs($student)
+        ->post(route('student.elections.ballot.progress', $election), [
+            'phase' => 'program',
+            'selections' => [
+                [
+                    'position_id' => $president->id,
+                    'candidate_id' => $presCand->id,
+                ],
+            ],
+        ])
+        ->assertRedirect(route('student.voting.index', ['phase' => 'program']));
 });

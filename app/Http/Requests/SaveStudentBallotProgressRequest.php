@@ -29,6 +29,7 @@ class SaveStudentBallotProgressRequest extends FormRequest
         $electionId = (int) $election->id;
 
         return [
+            'phase' => ['sometimes', 'nullable', 'string', Rule::in(['campus', 'program'])],
             'selections' => ['required', 'array', 'min:1'],
             'selections.*.position_id' => [
                 'required',
