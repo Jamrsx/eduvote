@@ -11,6 +11,8 @@ export type UseAppearanceReturn = {
 
 const listeners = new Set<() => void>();
 let currentAppearance: Appearance = 'system';
+/** When true, the UI stays in dark mode (student experience); system preference is ignored. */
+let studentDarkThemeLocked = false;
 
 const prefersDark = (): boolean => {
     if (typeof window === 'undefined') {
@@ -41,12 +43,19 @@ const isDarkMode = (appearance: Appearance): boolean => {
     return appearance === 'dark' || (appearance === 'system' && prefersDark());
 };
 
-const applyTheme = (appearance: Appearance): void => {
+const applyEffectiveTheme = (): void => {
     if (typeof document === 'undefined') {
         return;
     }
 
-    const isDark = isDarkMode(appearance);
+    if (studentDarkThemeLocked) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.style.colorScheme = 'dark';
+
+        return;
+    }
+
+    const isDark = isDarkMode(currentAppearance);
 
     document.documentElement.classList.toggle('dark', isDark);
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
@@ -68,12 +77,49 @@ const mediaQuery = (): MediaQueryList | null => {
     return window.matchMedia('(prefers-color-scheme: dark)');
 };
 
-const handleSystemThemeChange = (): void => applyTheme(currentAppearance);
+const handleSystemThemeChange = (): void => {
+    applyEffectiveTheme();
+};
+
+/**
+ * Lock or unlock student-only dark theme (called from AppLayout based on auth role).
+ */
+export function setStudentDarkThemeLock(locked: boolean): void {
+    studentDarkThemeLocked = locked;
+
+    if (locked) {
+        currentAppearance = 'dark';
+        localStorage.setItem('appearance', 'dark');
+        setCookie('appearance', 'dark');
+    } else {
+        currentAppearance = getStoredAppearance();
+        setCookie('appearance', currentAppearance);
+    }
+
+    applyEffectiveTheme();
+    notify();
+}
 
 export function initializeTheme(): void {
     if (typeof window === 'undefined') {
         return;
     }
+
+    const studentForcedMeta =
+        document.querySelector('meta[name="eduvote-student-forced-dark"]')?.getAttribute('content') === '1';
+
+    if (studentForcedMeta) {
+        studentDarkThemeLocked = true;
+        currentAppearance = 'dark';
+        localStorage.setItem('appearance', 'dark');
+        setCookie('appearance', 'dark');
+        applyEffectiveTheme();
+        mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+
+        return;
+    }
+
+    studentDarkThemeLocked = false;
 
     if (!localStorage.getItem('appearance')) {
         localStorage.setItem('appearance', 'system');
@@ -81,9 +127,7 @@ export function initializeTheme(): void {
     }
 
     currentAppearance = getStoredAppearance();
-    applyTheme(currentAppearance);
-
-    // Set up system theme change listener
+    applyEffectiveTheme();
     mediaQuery()?.addEventListener('change', handleSystemThemeChange);
 }
 
@@ -94,20 +138,19 @@ export function useAppearance(): UseAppearanceReturn {
         () => 'system',
     );
 
-    const resolvedAppearance: ResolvedAppearance = isDarkMode(appearance)
+    const resolvedAppearance: ResolvedAppearance = studentDarkThemeLocked || isDarkMode(appearance)
         ? 'dark'
         : 'light';
 
     const updateAppearance = (mode: Appearance): void => {
+        if (studentDarkThemeLocked) {
+            return;
+        }
+
         currentAppearance = mode;
-
-        // Store in localStorage for client-side persistence...
         localStorage.setItem('appearance', mode);
-
-        // Store in cookie for SSR...
         setCookie('appearance', mode);
-
-        applyTheme(mode);
+        applyEffectiveTheme();
         notify();
     };
 
