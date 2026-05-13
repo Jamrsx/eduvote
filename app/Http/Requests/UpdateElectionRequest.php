@@ -15,6 +15,21 @@ class UpdateElectionRequest extends FormRequest
         return $this->user()?->role === UserRole::Admin;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('lifecycle') === 'draft') {
+            $this->merge(['status' => ElectionStatus::Draft->value]);
+
+            return;
+        }
+
+        if ($this->input('lifecycle') !== 'published') {
+            return;
+        }
+
+        $this->merge(['status' => ElectionStatus::Scheduled->value]);
+    }
+
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -25,6 +40,7 @@ class UpdateElectionRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:5000'],
             'opens_at' => ['required', 'date'],
             'closes_at' => ['required', 'date', 'after:opens_at'],
+            'lifecycle' => ['required', Rule::in(['draft', 'published'])],
             'status' => ['required', Rule::enum(ElectionStatus::class)],
         ];
     }
@@ -38,6 +54,7 @@ class UpdateElectionRequest extends FormRequest
             'title' => 'title',
             'opens_at' => 'open date and time',
             'closes_at' => 'close date and time',
+            'lifecycle' => 'election mode',
         ];
     }
 }

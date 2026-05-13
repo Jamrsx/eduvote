@@ -91,4 +91,12 @@ class Election extends Model
     {
         return $this->hasMany(Vote::class);
     }
+
+    /**
+     * @return HasMany<BallotSubmission, $this>
+     */
+    public function ballotSubmissions(): HasMany
+    {
+        return $this->hasMany(BallotSubmission::class);
+    }
 }

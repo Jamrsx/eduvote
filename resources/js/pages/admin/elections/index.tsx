@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import { index as adminPartiesIndex } from '@/routes/admin/parties';
 import { CalendarDays, Flag, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -32,6 +32,7 @@ type ElectionRow = {
     title: string;
     description: string | null;
     status: string;
+    lifecycle: 'draft' | 'published';
     votes_count: number;
     opens_at_input: string | null;
     closes_at_input: string | null;
@@ -39,11 +40,11 @@ type ElectionRow = {
     closes_at_display: string | null;
 };
 
-type StatusOption = { value: string; label: string };
+type LifecycleOption = { value: string; label: string };
 
 type Props = {
     elections: ElectionRow[];
-    electionStatuses: StatusOption[];
+    electionLifecycles: LifecycleOption[];
     appTimezone: string;
 };
 
@@ -88,7 +89,7 @@ const textareaClasses = cn(
 
 export default function AdminElectionsIndex({
     elections,
-    electionStatuses,
+    electionLifecycles,
     appTimezone,
 }: Props) {
     const page = usePage<{
@@ -101,6 +102,25 @@ export default function AdminElectionsIndex({
     const [deleting, setDeleting] = useState<ElectionRow | null>(null);
     const [createKey, setCreateKey] = useState(0);
     const scheduleForCreate = useMemo(() => defaultSchedule(), [createKey]);
+
+    const shouldPollScheduleRows = useMemo(
+        () => elections.some((row) => row.lifecycle === 'published'),
+        [elections],
+    );
+
+    useEffect(() => {
+        if (!shouldPollScheduleRows) {
+            return;
+        }
+
+        const { stop } = router.poll(20_000, {
+            only: ['elections', 'electionLifecycles', 'appTimezone'],
+        });
+
+        return () => {
+            stop();
+        };
+    }, [shouldPollScheduleRows]);
 
     useEffect(() => {
         const msg = page.props.flash?.success;
@@ -189,8 +209,10 @@ export default function AdminElectionsIndex({
                             <CardTitle>Election periods</CardTitle>
                         </div>
                         <CardDescription>
-                            Status is managed here; scheduled jobs can align it
-                            with dates in a later release.
+                            Published elections move between scheduled, open,
+                            and closed automatically from open and close times
+                            (no server cron required). Draft stays off the voting
+                            schedule until you publish.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="px-0 sm:px-6">
@@ -319,12 +341,14 @@ export default function AdminElectionsIndex({
                             {editing ? 'Edit election' : 'New election'}
                         </DialogTitle>
                         <DialogDescription>
-                            Open and close times are stored using the
-                            application timezone (
+                            Open and close times use the application timezone (
                             <span className="font-mono text-xs text-foreground">
                                 {appTimezone}
                             </span>
-                            ).
+                            ). Choose Published to open and close the election
+                            automatically on that schedule; this page refreshes
+                            periodically so status updates without a manual
+                            reload.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -429,18 +453,22 @@ export default function AdminElectionsIndex({
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="status">Status</Label>
+                                    <Label htmlFor="lifecycle">
+                                        Election mode
+                                    </Label>
                                     <select
-                                        id="status"
-                                        name="status"
+                                        id="lifecycle"
+                                        name="lifecycle"
                                         required
                                         className={selectClasses}
                                         defaultValue={
-                                            editing?.status ?? 'draft'
+                                            editing?.lifecycle ?? 'published'
                                         }
-                                        aria-invalid={Boolean(errors.status)}
+                                        aria-invalid={Boolean(
+                                            errors.lifecycle,
+                                        )}
                                     >
-                                        {electionStatuses.map((opt) => (
+                                        {electionLifecycles.map((opt) => (
                                             <option
                                                 key={opt.value}
                                                 value={opt.value}
@@ -449,7 +477,7 @@ export default function AdminElectionsIndex({
                                             </option>
                                         ))}
                                     </select>
-                                    <InputError message={errors.status} />
+                                    <InputError message={errors.lifecycle} />
                                 </div>
 
                                 <DialogFooter className="gap-2 sm:gap-0">

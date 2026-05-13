@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\ElectionStatus;
 use App\Models\Election;
 use App\Models\User;
 use App\Models\Vote;
@@ -17,7 +16,7 @@ test('admin can create an election', function () {
             'description' => 'Campus-wide',
             'opens_at' => $opens->format('Y-m-d\TH:i'),
             'closes_at' => $closes->format('Y-m-d\TH:i'),
-            'status' => ElectionStatus::Draft->value,
+            'lifecycle' => 'draft',
         ])
         ->assertRedirect(route('admin.elections.index'));
 
@@ -33,7 +32,7 @@ test('admin cannot create election when closes_at is before opens_at', function 
             'description' => null,
             'opens_at' => now()->addWeek()->format('Y-m-d\TH:i'),
             'closes_at' => now()->addDay()->format('Y-m-d\TH:i'),
-            'status' => ElectionStatus::Draft->value,
+            'lifecycle' => 'draft',
         ])
         ->assertSessionHasErrors('closes_at');
 });

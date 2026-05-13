@@ -3,6 +3,7 @@
 namespace App\Services\Voting;
 
 use App\Enums\ElectionStatus;
+use App\Models\BallotSubmission;
 use App\Models\Candidate;
 use App\Models\Election;
 use App\Models\Position;
@@ -196,7 +197,14 @@ final class StudentBallotService
             $this->assertValidBallotRow($user, $election, $allowedMap, $row);
         }
 
-        $this->persistBallotRows($user, $election, $selections);
+        DB::transaction(function () use ($user, $election, $selections): void {
+            $this->persistBallotRows($user, $election, $selections);
+
+            BallotSubmission::query()->firstOrCreate([
+                'election_id' => $election->id,
+                'user_id' => $user->id,
+            ]);
+        });
     }
 
     /**
@@ -248,7 +256,7 @@ final class StudentBallotService
 
         $allowedMap = $this->allowedCandidatesByPosition($user, $election);
 
-        if ($this->ballotIsLocked($user, $election, $allowedMap)) {
+        if ($this->ballotIsLocked($user, $election)) {
             throw ValidationException::withMessages([
                 'selections' => 'You already submitted your ballot for this election. Choices cannot be changed.',
             ]);
@@ -321,40 +329,14 @@ final class StudentBallotService
     }
 
     /**
-     * True when the voter has a stored choice for every ballot line they are eligible for.
-     *
-     * @param  array<int, list<int>>  $allowedMap
+     * True after the voter has pressed final submit (not merely autosaved choices).
      */
-    public function ballotIsLocked(User $user, Election $election, ?array $allowedMap = null): bool
+    public function ballotIsLocked(User $user, Election $election): bool
     {
-        if ($allowedMap === null) {
-            $allowedMap = $this->allowedCandidatesByPosition($user, $election);
-        }
-
-        /** @var list<int> $eligible */
-        $eligible = array_values(array_map(
-            static fn (int|string $positionId): int => (int) $positionId,
-            array_keys($allowedMap),
-        ));
-        if ($eligible === []) {
-            return false;
-        }
-
-        sort($eligible);
-
-        /** @var list<int> $votedPositions */
-        $votedPositions = Vote::query()
+        return BallotSubmission::query()
             ->where('election_id', $election->id)
             ->where('user_id', $user->id)
-            ->whereIn('position_id', $eligible)
-            ->pluck('position_id')
-            ->map(static fn ($id): int => (int) $id)
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-
-        return $votedPositions === $eligible;
+            ->exists();
     }
 
     /**
@@ -638,7 +620,7 @@ final class StudentBallotService
 
         $allowedMap = $this->allowedCandidatesByPosition($user, $election);
 
-        $locked = $this->ballotIsLocked($user, $election, $allowedMap);
+        $locked = $this->ballotIsLocked($user, $election);
 
         if ($locked) {
             return [

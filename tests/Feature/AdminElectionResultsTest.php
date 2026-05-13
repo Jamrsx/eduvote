@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ElectionStatus;
+use App\Models\BallotSubmission;
 use App\Models\Candidate;
 use App\Models\Course;
 use App\Models\Election;
@@ -78,6 +79,13 @@ test('closed election exposes vote tallies in inertia props', function () {
         'user_id' => $voter3->id,
         'candidate_id' => $candB->id,
     ]);
+
+    foreach ([$voter1, $voter2, $voter3] as $voter) {
+        BallotSubmission::query()->create([
+            'election_id' => $election->id,
+            'user_id' => $voter->id,
+        ]);
+    }
 
     $response = $this->actingAs($admin)->get(route('admin.result.index'));
 

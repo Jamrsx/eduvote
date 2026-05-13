@@ -5,13 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\ElectionStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\BallotSubmission;
 use App\Models\Candidate;
 use App\Models\Course;
 use App\Models\Election;
 use App\Models\Position;
 use App\Models\StudentProfile;
 use App\Models\User;
-use App\Models\Vote;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,7 +48,7 @@ class AdminDashboardController extends Controller
                     'accounts' => User::query()->where('role', UserRole::Student)->count(),
                     'withProfile' => StudentProfile::query()->count(),
                 ],
-                'votesCast' => Vote::query()->count(),
+                'votesCast' => BallotSubmission::query()->count(),
                 'courses' => Course::query()->count(),
                 'candidates' => Candidate::query()->count(),
                 'positions' => Position::query()->count(),

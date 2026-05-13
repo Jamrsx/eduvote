@@ -535,43 +535,38 @@ export default function StudentVotingIndex({
 
     return (
         <>
-            <Head title="Vote" />
+            <Head title="Ballot" />
 
             <div className="flex flex-col gap-6">
                 <div className="space-y-1">
                     <h1 className="text-lg font-semibold tracking-tight">
-                        Cast your ballot
+                        Your ballot
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        You see{' '}
+                        You get{' '}
                         <span className="font-medium text-foreground">
-                            campus-wide party slates
+                            campus-wide
                         </span>{' '}
-                        plus slates for{' '}
+                        races and, when your profile has a program, races for{' '}
                         <span className="font-medium text-foreground">
-                            your program
-                        </span>{' '}
-                        when your account has a program assignment.
+                            that program
+                        </span>
+                        .
                     </p>
                     <p className="text-muted-foreground text-sm">
                         <span className="font-medium text-foreground">
-                            One choice per box.
+                            One nominee per section.
                         </span>{' '}
-                        Each shaded section is a{' '}
-                        <span className="font-medium text-foreground">
-                            different office
-                        </span>{' '}
-                        (a separate seat).                         {
-                            'If you see both "Governor" and "Governor 2", that is two offices in this election, not one race. Ask an admin to merge duplicate positions if you only want one Governor and one Vice Governor.'
-                        }
+                        Each section is one office (one seat). If two sections
+                        look alike, they are still two offices—ask an admin if
+                        the list should be combined.
                     </p>
                     {student_course_label ? (
                         <p className="text-muted-foreground text-xs">
-                            Your program:{' '}
+                            Program:{' '}
                             <span className="font-medium text-foreground">
                                 {student_course_label}
                             </span>
-                            .
                         </p>
                     ) : null}
                 </div>
@@ -940,6 +935,11 @@ export default function StudentVotingIndex({
                                                                   )}
                                                         </p>
                                                     ) : null}
+                                                    <p className="text-muted-foreground text-xs">
+                                                        Autosave keeps picks if you leave this page.
+                                                        Change any office until you submit; the ballot
+                                                        is final only after you press submit.
+                                                    </p>
                                                     <Button
                                                         type="submit"
                                                         disabled={processing}

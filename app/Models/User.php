@@ -86,6 +86,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<BallotSubmission, $this>
+     */
+    public function ballotSubmissions(): HasMany
+    {
+        return $this->hasMany(BallotSubmission::class);
+    }
+
+    /**
      * @return HasMany<StudentImportBatch, $this>
      */
     public function studentImportBatches(): HasMany

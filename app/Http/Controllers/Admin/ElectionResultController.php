@@ -6,11 +6,27 @@ use App\Enums\ElectionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Election;
 use App\Models\Vote;
+use Illuminate\Database\Eloquent\Builder;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ElectionResultController extends Controller
 {
+    /**
+     * Votes that belong to a formally submitted ballot (excludes autosave-only rows).
+     *
+     * @param  Builder<Vote>  $query
+     */
+    private function restrictToSubmittedBallots(Builder $query): Builder
+    {
+        return $query->whereExists(function ($sub): void {
+            $sub->selectRaw('1')
+                ->from('ballot_submissions')
+                ->whereColumn('ballot_submissions.user_id', 'votes.user_id')
+                ->whereColumn('ballot_submissions.election_id', 'votes.election_id');
+        });
+    }
+
     /**
      * Official tallies for closed elections (read-only).
      */
@@ -44,7 +60,7 @@ class ElectionResultController extends Controller
         $tallyByElectionPositionCandidate = [];
 
         if ($electionIds !== []) {
-            $distinctVotersByElection = Vote::query()
+            $distinctVotersByElection = $this->restrictToSubmittedBallots(Vote::query())
                 ->whereIn('election_id', $electionIds)
                 ->selectRaw('election_id, COUNT(DISTINCT user_id) as c')
                 ->groupBy('election_id')
@@ -52,7 +68,7 @@ class ElectionResultController extends Controller
                 ->mapWithKeys(fn ($count, $id): array => [(int) $id => (int) $count])
                 ->all();
 
-            $totalSelectionsByElection = Vote::query()
+            $totalSelectionsByElection = $this->restrictToSubmittedBallots(Vote::query())
                 ->whereIn('election_id', $electionIds)
                 ->selectRaw('election_id, COUNT(*) as c')
                 ->groupBy('election_id')
@@ -60,7 +76,7 @@ class ElectionResultController extends Controller
                 ->mapWithKeys(fn ($count, $id): array => [(int) $id => (int) $count])
                 ->all();
 
-            $rows = Vote::query()
+            $rows = $this->restrictToSubmittedBallots(Vote::query())
                 ->whereIn('election_id', $electionIds)
                 ->selectRaw('election_id, position_id, candidate_id, COUNT(*) as vote_count')
                 ->groupBy('election_id', 'position_id', 'candidate_id')

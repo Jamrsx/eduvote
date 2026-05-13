@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\BallotSubmission;
 use App\Models\Candidate;
 use App\Models\Course;
 use App\Models\Election;
@@ -292,4 +293,67 @@ test('student autosave restores partial ballot choices after revisit', function 
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->where('elections.0.ballot_locked', true));
+});
+
+test('autosaving every office does not lock the ballot until final submit', function (): void {
+    $election = Election::factory()->acceptingNow()->create();
+    $course = Course::factory()->create([
+        'code' => 'BSIT',
+        'name' => 'Information Technology',
+    ]);
+
+    $president = Position::factory()->for($election)->forCampus()->create([
+        'name' => 'President',
+        'sort_order' => 0,
+    ]);
+    $vice = Position::factory()->for($election)->forCampus()->create([
+        'name' => 'Vice President',
+        'sort_order' => 1,
+    ]);
+
+    $party = Party::factory()->for($election)->create([
+        'course_id' => null,
+        'name' => 'Unity Slate',
+    ]);
+
+    $presidentCand = Candidate::factory()->forBallot($election, $president)->create([
+        'party_id' => $party->id,
+    ]);
+    $viceCand = Candidate::factory()->forBallot($election, $vice)->create([
+        'party_id' => $party->id,
+    ]);
+
+    $student = User::factory()->student()->create();
+    StudentProfile::factory()->create([
+        'user_id' => $student->id,
+        'course_id' => $course->id,
+    ]);
+
+    $this->actingAs($student)
+        ->post(route('student.elections.ballot.progress', $election), [
+            'selections' => [
+                [
+                    'position_id' => $president->id,
+                    'candidate_id' => $presidentCand->id,
+                ],
+                [
+                    'position_id' => $vice->id,
+                    'candidate_id' => $viceCand->id,
+                ],
+            ],
+        ])
+        ->assertRedirect(route('student.voting.index'));
+
+    expect(BallotSubmission::query()->where([
+        'election_id' => $election->id,
+        'user_id' => $student->id,
+    ])->doesntExist())->toBeTrue();
+
+    $this->actingAs($student)
+        ->get(route('student.voting.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('student/voting/index')
+            ->where('elections.0.ballot_locked', false)
+            ->has('elections.0.races', 2));
 });
