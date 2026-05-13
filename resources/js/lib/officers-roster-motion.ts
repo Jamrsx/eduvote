@@ -7,6 +7,7 @@ import {
     createThrottledScrambleTick,
     playHeroPopSound,
     playRevealSectionComplete,
+    playShineGlareSound,
     resumeRevealAudio,
 } from '@/lib/reveal-sound';
 
@@ -110,6 +111,8 @@ async function runOfficersHeroCardCelebration(
     const sweep = Math.max(shell.offsetWidth * 0.85, 280);
 
     shine.style.opacity = '0';
+
+    playShineGlareSound(0.14);
 
     await animate(shine, {
         opacity: [0, 0.82, 0],
@@ -238,6 +241,8 @@ async function runNomineeCardShine(row: HTMLElement): Promise<void> {
     const sweep = Math.max(row.offsetWidth * 0.9, 200);
 
     shine.style.opacity = '0';
+
+    playShineGlareSound(0.12);
 
     await animate(shine, {
         opacity: [0, 0.78, 0],

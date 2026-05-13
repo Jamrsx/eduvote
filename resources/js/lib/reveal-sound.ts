@@ -156,6 +156,53 @@ export function playHeroPopSound(volume = 0.22): void {
     });
 }
 
+/**
+ * Metallic “shing” for shine / glare sweeps (hero + nominee cards).
+ */
+export function playShineGlareSound(volume = 0.15): void {
+    runWhenAudioCanRender((ctx) => {
+        const t0 = ctx.currentTime;
+        const dur = 0.24;
+
+        const body = ctx.createOscillator();
+        const bodyG = ctx.createGain();
+        body.type = 'sine';
+        body.frequency.setValueAtTime(1750, t0);
+        body.frequency.exponentialRampToValueAtTime(5200, t0 + dur * 0.62);
+        bodyG.gain.setValueAtTime(volume, t0);
+        bodyG.gain.exponentialRampToValueAtTime(0.0009, t0 + dur);
+        body.connect(bodyG);
+        bodyG.connect(ctx.destination);
+
+        const edge = ctx.createOscillator();
+        const edgeG = ctx.createGain();
+        edge.type = 'triangle';
+        edge.frequency.setValueAtTime(3800, t0);
+        edge.frequency.exponentialRampToValueAtTime(9600, t0 + dur * 0.48);
+        edgeG.gain.setValueAtTime(volume * 0.38, t0);
+        edgeG.gain.exponentialRampToValueAtTime(0.0008, t0 + dur * 0.72);
+        edge.connect(edgeG);
+        edgeG.connect(ctx.destination);
+
+        const ring = ctx.createOscillator();
+        const ringG = ctx.createGain();
+        ring.type = 'sine';
+        ring.frequency.setValueAtTime(12000, t0);
+        ring.frequency.exponentialRampToValueAtTime(6500, t0 + dur * 0.35);
+        ringG.gain.setValueAtTime(volume * 0.12, t0);
+        ringG.gain.exponentialRampToValueAtTime(0.0006, t0 + dur * 0.45);
+        ring.connect(ringG);
+        ringG.connect(ctx.destination);
+
+        body.start(t0);
+        body.stop(t0 + dur + 0.02);
+        edge.start(t0);
+        edge.stop(t0 + dur * 0.78 + 0.02);
+        ring.start(t0);
+        ring.stop(t0 + dur * 0.5 + 0.02);
+    });
+}
+
 export function createThrottledScrambleTick(
     minIntervalMs: number,
 ): (progress: number) => void {
